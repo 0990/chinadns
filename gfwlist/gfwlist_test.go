@@ -63,3 +63,7 @@ func TestGFWListDomain1(t *testing.T) {
 		log.Printf("%s->%v", rule, gfw.IsDomainBlocked(rule))
 	}
 }
+
+func TestUpdateGFWFile(t *testing.T) {
+
+}
