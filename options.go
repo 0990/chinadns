@@ -53,7 +53,7 @@ func WithDNS(dnsChina, dnsAbroad []string) ServerOption {
 
 func WithGFWFile(addr string) ServerOption {
 	return func(o *serverOptions) error {
-		gfw, err := gfwlist.NewFromFile("gfwlist.txt", true)
+		gfw, err := gfwlist.NewFromFile("gfwlist.txt", false)
 		if err != nil {
 			return err
 		}
