@@ -18,8 +18,13 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 	qName := req.Question[0].Name
 
+	domain := qName
+	if len(domain) > 0 {
+		domain = domain[:len(domain)-1]
+	}
+
 	dnsServer := s.DNSChinaServers
-	if s.gfwlist.IsDomainBlocked(qName) {
+	if s.gfwlist.IsDomainBlocked(domain) {
 		dnsServer = s.DNSAbroadServers
 	}
 
