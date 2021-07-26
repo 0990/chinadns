@@ -37,10 +37,11 @@ func NewClient(opts ...ClientOption) *Client {
 	}
 }
 
-func (c *Client) lookup(req *dns.Msg, server *Resolver) (reply *dns.Msg, rtt time.Duration, err error) {
+func (c *Client) lookup(reqID uint32, req *dns.Msg, server *Resolver) (reply *dns.Msg, rtt time.Duration, err error) {
 	logger := logrus.WithFields(logrus.Fields{
 		"question": questionString(&req.Question[0]),
 		"server":   server,
+		"id":       reqID,
 	})
 
 	var rtt0 time.Duration

@@ -46,6 +46,7 @@ func main() {
 		chinadns.WithListenAddr(cfg.Listen),
 		chinadns.WithDNS(cfg.DNSChina, cfg.DNSAbroad),
 		chinadns.WithGFWFile(cfg.GFWPath),
+		chinadns.WithCHNFile(cfg.ChnPath),
 	}
 
 	client := chinadns.NewClient(copts...)

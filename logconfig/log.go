@@ -8,12 +8,15 @@ import (
 )
 
 func InitLogrus(name string, maxMB int, level logrus.Level) {
+
 	formatter := &logrus.TextFormatter{
 		DisableColors:    true,
 		DisableTimestamp: false,
 		TimestampFormat:  "2006-01-02 15:04:05",
 	}
+
 	logrus.SetFormatter(formatter)
+
 	logrus.SetLevel(level)
 	logrus.AddHook(NewDefaultHook(name, maxMB))
 }
@@ -25,8 +28,7 @@ type DefaultHook struct {
 }
 
 func NewDefaultHook(name string, maxSize int) *DefaultHook {
-	formatter := &logrus.TextFormatter{
-		DisableColors:    true,
+	formatter := &logrus.JSONFormatter{
 		DisableTimestamp: false,
 	}
 

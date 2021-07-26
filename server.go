@@ -12,6 +12,8 @@ type Server struct {
 	*Client
 	UDPServer *dns.Server
 	TCPServer *dns.Server
+
+	requestID uint32
 }
 
 func NewServer(cli *Client, opts ...ServerOption) (*Server, error) {

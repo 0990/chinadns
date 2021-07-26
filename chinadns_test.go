@@ -12,7 +12,7 @@ func Test_CreateConfig(t *testing.T) {
 		Listen:      "0.0.0.0:53",
 		UDPMaxBytes: 4096,
 		Timeout:     2,
-		GFWPath:     "gfw.txt",
+		GFWPath:     []string{"gfwlist.txt"},
 		DNSChina:    []string{"114.114.114.114"},
 		DNSAbroad:   []string{"8.8.8.8"},
 		LogLevel:    "debug",

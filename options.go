@@ -1,7 +1,12 @@
 package chinadns
 
 import (
+	"bufio"
+	"fmt"
 	"github.com/0990/chinadns/gfwlist"
+	"github.com/yl2chen/cidranger"
+	"net"
+	"os"
 )
 
 // ServerOption provides ChinaDNS server options. Please use WithXXX functions to generate Options.
@@ -13,7 +18,8 @@ type serverOptions struct {
 	DNSChinaServers  resolverList // DNS servers which can be trusted
 	DNSAbroadServers resolverList // DNS servers which may return polluted results
 
-	gfwlist *gfwlist.GFWList
+	gfwlist   *gfwlist.GFWList
+	ChinaCIDR cidranger.Ranger
 }
 
 func newServerOptions() *serverOptions {
@@ -51,13 +57,46 @@ func WithDNS(dnsChina, dnsAbroad []string) ServerOption {
 	}
 }
 
-func WithGFWFile(addr string) ServerOption {
+func WithGFWFile(addr []string) ServerOption {
 	return func(o *serverOptions) error {
-		gfw, err := gfwlist.NewFromFile("gfwlist.txt", false)
+		gfw, err := gfwlist.NewFromFiles(addr, false)
 		if err != nil {
 			return err
 		}
 		o.gfwlist = gfw
+		return nil
+	}
+}
+
+func WithCHNFile(path string) ServerOption {
+	return func(o *serverOptions) error {
+		if path == "" {
+			return fmt.Errorf("%w for China route list")
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			return fmt.Errorf("fail to open China route list: %w", err)
+
+		}
+		defer file.Close()
+
+		if o.ChinaCIDR == nil {
+			o.ChinaCIDR = cidranger.NewPCTrieRanger()
+		}
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			_, network, err := net.ParseCIDR(scanner.Text())
+			if err != nil {
+				return fmt.Errorf("parse %s as CIDR failed: %v", scanner.Text(), err.Error())
+			}
+			err = o.ChinaCIDR.Insert(cidranger.NewBasicRangerEntry(*network))
+			if err != nil {
+				return fmt.Errorf("insert %s as CIDR failed: %v", scanner.Text(), err.Error())
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			return fmt.Errorf("fail to scan china route list: %v", err.Error())
+		}
 		return nil
 	}
 }

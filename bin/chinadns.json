@@ -2,12 +2,13 @@
    "listen": "0.0.0.0:53",
    "udp-max-bytes": 4096,
    "timeout": 2,
-   "gfw_path": "gfw.txt",
+   "gfw_path": ["gfwlist.txt","gfwuser.txt"],
    "dns-china": [
       "114.114.114.114"
    ],
    "dns-abroad": [
       "8.8.8.8"
    ],
+   "chn_path": "chnroute.txt",
    "log_level": "debug"
 }

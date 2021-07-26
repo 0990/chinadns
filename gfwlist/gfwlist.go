@@ -343,6 +343,19 @@ func NewFromFile(file string, base64Encoding bool) (*GFWList, error) {
 	}
 	return gfw, nil
 }
+
+func NewFromFiles(files []string, base64Encoding bool) (*GFWList, error) {
+	gfw := &GFWList{}
+	gfw.fastMatchMap = make(map[string][]gfwListRule)
+	for _, file := range files {
+		err := gfw.Load(file, base64Encoding)
+		if nil != err {
+			return nil, err
+		}
+	}
+	return gfw, nil
+}
+
 func NewFromString(str string, base64Encoding bool) (*GFWList, error) {
 	gfw := &GFWList{}
 	gfw.fastMatchMap = make(map[string][]gfwListRule)

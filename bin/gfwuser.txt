@@ -1,0 +1,2 @@
+*.omtrdc.net
+aa.cloudfront.net
