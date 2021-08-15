@@ -15,6 +15,8 @@ type ServerOption func(*serverOptions) error
 type serverOptions struct {
 	Listen string // Listening address, such as `[::]:53`, `0.0.0.0:53`
 
+	CacheExpireSec int64
+
 	DNSChinaServers  resolverList // DNS servers which can be trusted
 	DNSAbroadServers resolverList // DNS servers which may return polluted results
 
@@ -31,6 +33,13 @@ func newServerOptions() *serverOptions {
 func WithListenAddr(addr string) ServerOption {
 	return func(o *serverOptions) error {
 		o.Listen = addr
+		return nil
+	}
+}
+
+func WithCacheExpireSec(sec int) ServerOption {
+	return func(o *serverOptions) error {
+		o.CacheExpireSec = int64(sec)
 		return nil
 	}
 }
@@ -71,7 +80,7 @@ func WithGFWFile(addr []string) ServerOption {
 func WithCHNFile(path string) ServerOption {
 	return func(o *serverOptions) error {
 		if path == "" {
-			return fmt.Errorf("%w for China route list")
+			return fmt.Errorf("empty for China route list")
 		}
 		file, err := os.Open(path)
 		if err != nil {

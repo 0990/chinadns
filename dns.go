@@ -37,6 +37,13 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 	reqDomain := reqDomain(req)
 
+	if v, ok := s.cache.Get(reqDomain); ok {
+		reply = v
+		reply.Id = req.Id
+		logger.Debug("Cache HIT")
+		return
+	}
+
 	s.normalizeRequest(req)
 
 	//gfw block的域名直接使用国外dns
@@ -76,6 +83,10 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		case <-time.After(time.Second * 3):
 			return
 		}
+	}
+
+	if reply != nil {
+		s.cache.Set(reqDomain, reply)
 	}
 }
 

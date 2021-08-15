@@ -2,6 +2,7 @@
    "listen": "0.0.0.0:53",
    "udp-max-bytes": 4096,
    "timeout": 2,
+   "cache_expire_sec": 30,
    "gfw_path": ["gfwlist.txt","gfwuser.txt"],
    "dns-china": [
       "114.114.114.114"

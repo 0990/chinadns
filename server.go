@@ -14,6 +14,8 @@ type Server struct {
 	TCPServer *dns.Server
 
 	requestID uint32
+
+	cache DNSCache
 }
 
 func NewServer(cli *Client, opts ...ServerOption) (*Server, error) {
@@ -25,11 +27,13 @@ func NewServer(cli *Client, opts ...ServerOption) (*Server, error) {
 		}
 	}
 
+	//ss-tproxy need 53 port udp4,otherwise not work,set udp back when fix
 	s := &Server{
 		serverOptions: o,
 		Client:        cli,
-		UDPServer:     &dns.Server{Addr: o.Listen, Net: "udp"},
-		TCPServer:     &dns.Server{Addr: o.Listen, Net: "tcp"},
+		UDPServer:     &dns.Server{Addr: o.Listen, Net: "udp4"},
+		TCPServer:     &dns.Server{Addr: o.Listen, Net: "tcp4"},
+		cache:         newDNSCache(o.CacheExpireSec),
 	}
 
 	s.UDPServer.Handler = dns.HandlerFunc(s.Serve)
