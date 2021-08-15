@@ -24,7 +24,14 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	var reply *dns.Msg
 	var err error
 
+	var fromCache bool
+
+	reqDomain := reqDomain(req)
+
 	defer func() {
+		if !fromCache && reply != nil {
+			s.cache.Set(reqDomain, reply)
+		}
 		if reply == nil {
 			reply = new(dns.Msg)
 			reply.SetReply(req)
@@ -35,9 +42,8 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		logger.Debug("SERVING RTT: ", time.Since(start), " IP:", answerIPString(reply))
 	}()
 
-	reqDomain := reqDomain(req)
-
 	if v, ok := s.cache.Get(reqDomain); ok {
+		fromCache = true
 		reply = v
 		reply.Id = req.Id
 		logger.Debug("Cache HIT")
@@ -83,10 +89,6 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		case <-time.After(time.Second * 3):
 			return
 		}
-	}
-
-	if reply != nil {
-		s.cache.Set(reqDomain, reply)
 	}
 }
 
