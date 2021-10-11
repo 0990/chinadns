@@ -5,11 +5,17 @@ import (
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
 	"net"
+	"strings"
 	"sync/atomic"
 	"time"
 )
 
 type LookupFunc func(id uint32, request *dns.Msg, server *Resolver) (reply *dns.Msg, rtt time.Duration, err error)
+
+type LookupResult struct {
+	reply    *dns.Msg
+	resolver *Resolver
+}
 
 func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	reqID := s.newID()
@@ -21,70 +27,103 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 	start := time.Now()
 
-	var reply *dns.Msg
 	var err error
+	var lookupRet *LookupResult
 
-	var fromCache bool
+	//var fromCache bool
 
 	reqDomain := reqDomain(req)
 
 	defer func() {
-		if !fromCache && reply != nil {
-			s.cache.Set(reqDomain, reply)
-		}
-		if reply == nil {
-			reply = new(dns.Msg)
+		//if !fromCache && lookupRet != nil {
+		//	s.cache.Set(reqDomain, lookupRet.reply)
+		//}
+		if lookupRet == nil {
+			logger.Warn("reply==nil")
+			reply := new(dns.Msg)
 			reply.SetReply(req)
+
+			lookupRet.reply = reply
 		}
 		// https://github.com/miekg/dns/issues/216
-		reply.Compress = true
-		_ = w.WriteMsg(reply)
-		logger.Debug("SERVING RTT: ", time.Since(start), " IP:", answerIPString(reply))
+		lookupRet.reply.Compress = true
+		_ = w.WriteMsg(lookupRet.reply)
+
+		replyRet := replyString(lookupRet.reply)
+
+		logger.WithFields(logrus.Fields{
+			"RTT":    timeSinceMS(start),
+			"server": lookupRet.resolver,
+			"reply":  replyRet,
+		}).Debug("DNS reply")
+
+		if replyRet == "" {
+			logger.WithFields(logrus.Fields{
+				"RTT":    timeSinceMS(start),
+				"server": lookupRet.resolver,
+				"reply":  replyRet,
+			}).Error("DNS reply empty")
+		}
 	}()
 
-	if v, ok := s.cache.Get(reqDomain); ok {
-		fromCache = true
-		reply = v
-		reply.Id = req.Id
-		logger.Debug("Cache HIT")
-		return
-	}
+	//if v, ok := s.cache.Get(reqDomain); ok {
+	//	fromCache = true
+	//	reply = v
+	//	reply.Id = req.Id
+	//	logger.Debug("Cache HIT")
+	//	return
+	//}
 
 	s.normalizeRequest(req)
 
 	//gfw block的域名直接使用国外dns
 	if s.gfwlist.IsDomainBlocked(reqDomain) {
-		reply, err = lookupInServers(reqID, req, s.DNSAbroadServers, time.Second*3, s.lookup)
+		lookupRet, err = lookupInServers(reqID, req, s.DNSAbroadServers, time.Second*2, s.lookup)
 		if err != nil {
 			logger.WithError(err).Error("query error")
 			return
 		}
+
+		logger.WithFields(logrus.Fields{
+			"RTT":    timeSinceMS(start),
+			"server": lookupRet.resolver,
+			"reply":  replyString(lookupRet.reply),
+		}).Debug("Query result")
 		return
 	}
 
-	replyAbroad := make(chan *dns.Msg, 1)
+	lookupRetAbroad := make(chan *LookupResult, 1)
 	go func() {
-		reply, err := lookupInServers(reqID, req, s.DNSAbroadServers, time.Second*3, s.lookup)
+		ret, err := lookupInServers(reqID, req, s.DNSAbroadServers, time.Second*2, s.lookup)
 		if err != nil {
 			logger.WithError(err).Error("query error")
 			return
 		}
-		replyAbroad <- reply
+		lookupRetAbroad <- ret
 	}()
 
-	reply, err = lookupInServers(reqID, req, s.DNSChinaServers, time.Second*3, s.lookup)
+	lookupRet, err = lookupInServers(reqID, req, s.DNSChinaServers, time.Millisecond*500, s.lookup)
 	if err != nil {
 		logger.WithError(err).Error("query error")
 		return
 	}
 
-	//使用国内dns但返回的是国外ip,则用国外dns的查询结果
-	if !s.isReplyIPChn(reply) {
-		logger.Debug("ChinaDNS SERVING RTT: ", time.Since(start), " IP:", answerIPString(reply))
+	logger.WithFields(logrus.Fields{
+		"RTT":    timeSinceMS(start),
+		"server": lookupRet.resolver,
+		"reply":  replyString(lookupRet.reply),
+	}).Debug("Query result")
 
+	//使用国内dns但返回的是国外ip,则用国外dns的查询结果
+	if !s.isReplyIPChn(lookupRet.reply) {
 		logrus.WithField("domain", reqDomain).Warn("use china dns,but reply is abroad")
 		select {
-		case reply = <-replyAbroad:
+		case lookupRet = <-lookupRetAbroad:
+			logger.WithFields(logrus.Fields{
+				"RTT":    timeSinceMS(start),
+				"server": lookupRet.resolver,
+				"reply":  replyString(lookupRet.reply),
+			}).Debug("Query result")
 			return
 		case <-time.After(time.Second * 3):
 			return
@@ -137,6 +176,22 @@ func replyIP(reply *dns.Msg) []net.IP {
 	return ip
 }
 
+func replyCName(reply *dns.Msg) (ret []string) {
+	for _, rr := range reply.Answer {
+		switch answer := rr.(type) {
+		case *dns.A:
+			continue
+		case *dns.AAAA:
+			continue
+		case *dns.CNAME:
+			ret = append(ret, answer.Target)
+		default:
+			continue
+		}
+	}
+	return ret
+}
+
 func answerIPString(reply *dns.Msg) string {
 	ips := replyIP(reply)
 	var ip string
@@ -147,52 +202,49 @@ func answerIPString(reply *dns.Msg) string {
 	return ip
 }
 
-func lookupInServers(reqID uint32, req *dns.Msg, servers []*Resolver, waitInterval time.Duration, lookup LookupFunc) (*dns.Msg, error) {
+func answerCNameString(reply *dns.Msg) string {
+	ips := replyCName(reply)
+	return strings.Join(ips, ";")
+}
+
+func replyString(reply *dns.Msg) string {
+	return answerIPString(reply) + answerCNameString(reply)
+}
+
+func lookupInServers(reqID uint32, req *dns.Msg, servers []*Resolver, waitInterval time.Duration, lookup LookupFunc) (*LookupResult, error) {
 	if len(servers) == 0 {
 		return nil, errors.New("no servers")
 	}
 
-	//logger := logrus.WithField("question", questionString(&req.Question[0]))
+	result := make(chan *LookupResult, 1)
 
-	queryNext := make(chan struct{}, len(servers))
-	queryNext <- struct{}{}
-
-	result := make(chan *dns.Msg, 1)
-
-	dolookup := func(server *Resolver) {
-		//logger := logger.WithField("server", server.GetAddr())
-
+	doLookup := func(server *Resolver) {
 		reply, _, err := lookup(reqID, req.Copy(), server)
 		if err != nil {
-			queryNext <- struct{}{}
+			logrus.WithFields(logrus.Fields{
+				"server":   server,
+				"question": questionString(&req.Question[0]),
+			}).WithError(err).Error("lookup")
 			return
 		}
 
 		select {
-		case result <- reply:
-			//logger.Debug("Query RTT: ", rtt)
+		case result <- &LookupResult{
+			reply:    reply,
+			resolver: server,
+		}:
 		default:
-
 		}
 	}
 
-	waitTicker := time.NewTimer(waitInterval)
-	defer waitTicker.Stop()
-
 	for _, server := range servers {
-		waitTicker.Reset(waitInterval)
-		select {
-		case <-queryNext:
-			go dolookup(server)
-		case <-waitTicker.C:
-			go dolookup(server)
-		}
+		go doLookup(server)
 	}
 
 	select {
 	case ret := <-result:
 		return ret, nil
-	case <-time.After(time.Second * 5):
+	case <-time.After(waitInterval):
 		return nil, errors.New("query timeout")
 	}
 }
