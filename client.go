@@ -49,7 +49,7 @@ func (c *Client) lookup(reqID uint32, req *dns.Msg, server *Resolver) (reply *dn
 	for _, protocol := range server.Protocols {
 		switch protocol {
 		case "udp":
-			logger.Debug("Query upstream udp")
+			//logger.Debug("Query upstream udp")
 			reply, rtt0, err = c.UDPCli.Exchange(req, server.GetAddr())
 			rtt += rtt0
 			if err == nil {

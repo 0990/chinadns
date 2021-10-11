@@ -43,7 +43,7 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 			reply := new(dns.Msg)
 			reply.SetReply(req)
 
-			lookupRet.reply = reply
+			lookupRet = &LookupResult{reply: reply}
 		}
 		// https://github.com/miekg/dns/issues/216
 		lookupRet.reply.Compress = true
@@ -55,6 +55,7 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 			"RTT":    timeSinceMS(start),
 			"server": lookupRet.resolver,
 			"reply":  replyRet,
+			"detail": lookupRet.reply.String(),
 		}).Debug("DNS reply")
 
 		if replyRet == "" {
@@ -176,7 +177,7 @@ func replyIP(reply *dns.Msg) []net.IP {
 	return ip
 }
 
-func replyCName(reply *dns.Msg) (ret []string) {
+func replyCDName(reply *dns.Msg) (ret []string) {
 	for _, rr := range reply.Answer {
 		switch answer := rr.(type) {
 		case *dns.A:
@@ -184,6 +185,8 @@ func replyCName(reply *dns.Msg) (ret []string) {
 		case *dns.AAAA:
 			continue
 		case *dns.CNAME:
+			ret = append(ret, answer.Target)
+		case *dns.DNAME:
 			ret = append(ret, answer.Target)
 		default:
 			continue
@@ -202,13 +205,14 @@ func answerIPString(reply *dns.Msg) string {
 	return ip
 }
 
-func answerCNameString(reply *dns.Msg) string {
-	ips := replyCName(reply)
+func answerCDNameString(reply *dns.Msg) string {
+	ips := replyCDName(reply)
 	return strings.Join(ips, ";")
 }
 
 func replyString(reply *dns.Msg) string {
-	return answerIPString(reply) + answerCNameString(reply)
+	//return reply.String()
+	return answerIPString(reply) + answerCDNameString(reply)
 }
 
 func lookupInServers(reqID uint32, req *dns.Msg, servers []*Resolver, waitInterval time.Duration, lookup LookupFunc) (*LookupResult, error) {
@@ -225,6 +229,10 @@ func lookupInServers(reqID uint32, req *dns.Msg, servers []*Resolver, waitInterv
 				"server":   server,
 				"question": questionString(&req.Question[0]),
 			}).WithError(err).Error("lookup")
+			return
+		}
+
+		if replyString(reply) == "" {
 			return
 		}
 
