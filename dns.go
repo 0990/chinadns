@@ -6,6 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"net"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -57,14 +58,6 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 			"reply":  replyRet,
 			"detail": lookupRet.reply.String(),
 		}).Debug("DNS reply")
-
-		if replyRet == "" {
-			logger.WithFields(logrus.Fields{
-				"RTT":    timeSinceMS(start),
-				"server": lookupRet.resolver,
-				"reply":  replyRet,
-			}).Error("DNS reply empty")
-		}
 	}()
 
 	//if v, ok := s.cache.Get(reqDomain); ok {
@@ -77,8 +70,24 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 	s.normalizeRequest(req)
 
+	//国内域名直接走国内dns
+	if s.chnDomainMatcher.IsMatch(reqDomain) {
+		lookupRet, err = lookupInServers(reqID, req, s.DNSChinaServers, time.Second*2, s.lookup)
+		if err != nil {
+			logger.WithError(err).Error("query error")
+			return
+		}
+
+		logger.WithFields(logrus.Fields{
+			"RTT":    timeSinceMS(start),
+			"server": lookupRet.resolver,
+			"reply":  replyString(lookupRet.reply),
+		}).Debug("Query result")
+		return
+	}
+
 	//gfw block的域名直接使用国外dns
-	if s.gfwlist.IsDomainBlocked(reqDomain) {
+	if s.gfwDomainMatcher.IsMatch(reqDomain) {
 		lookupRet, err = lookupInServers(reqID, req, s.DNSAbroadServers, time.Second*2, s.lookup)
 		if err != nil {
 			logger.WithError(err).Error("query error")
@@ -103,7 +112,7 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		lookupRetAbroad <- ret
 	}()
 
-	lookupRet, err = lookupInServers(reqID, req, s.DNSChinaServers, time.Millisecond*500, s.lookup)
+	lookupRet, err = lookupInServers(reqID, req, s.DNSChinaServers, time.Second*1, s.lookup)
 	if err != nil {
 		logger.WithError(err).Error("query error")
 		return
@@ -157,7 +166,7 @@ func (s *Server) isReplyIPChn(reply *dns.Msg) bool {
 			return true
 		}
 	}
-	return false
+	return true
 }
 
 func replyIP(reply *dns.Msg) []net.IP {
@@ -222,17 +231,17 @@ func lookupInServers(reqID uint32, req *dns.Msg, servers []*Resolver, waitInterv
 
 	result := make(chan *LookupResult, 1)
 
+	var wg sync.WaitGroup
+
 	doLookup := func(server *Resolver) {
-		reply, _, err := lookup(reqID, req.Copy(), server)
+		defer wg.Done()
+		reply, rtt, err := lookup(reqID, req.Copy(), server)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
 				"server":   server,
 				"question": questionString(&req.Question[0]),
+				"RTT":      int64(rtt / time.Millisecond),
 			}).WithError(err).Error("lookup")
-			return
-		}
-
-		if replyString(reply) == "" {
 			return
 		}
 
@@ -246,14 +255,24 @@ func lookupInServers(reqID uint32, req *dns.Msg, servers []*Resolver, waitInterv
 	}
 
 	for _, server := range servers {
+		wg.Add(1)
 		go doLookup(server)
 	}
+
+	done := make(chan struct{}, 0)
+
+	go func() {
+		wg.Wait()
+		done <- struct{}{}
+	}()
 
 	select {
 	case ret := <-result:
 		return ret, nil
 	case <-time.After(waitInterval):
 		return nil, errors.New("query timeout")
+	case <-done:
+		return nil, errors.New("all lookup error")
 	}
 }
 

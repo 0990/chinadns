@@ -3,7 +3,7 @@ package chinadns
 import (
 	"bufio"
 	"fmt"
-	"github.com/0990/chinadns/gfwlist"
+	"github.com/0990/chinadns/matcher"
 	"github.com/yl2chen/cidranger"
 	"net"
 	"os"
@@ -20,8 +20,11 @@ type serverOptions struct {
 	DNSChinaServers  resolverList // DNS servers which can be trusted
 	DNSAbroadServers resolverList // DNS servers which may return polluted results
 
-	gfwlist   *gfwlist.GFWList
+	//gfwlist   *gfwlist.GFWList
 	ChinaCIDR cidranger.Ranger
+
+	chnDomainMatcher matcher.Matcher
+	gfwDomainMatcher matcher.Matcher
 }
 
 func newServerOptions() *serverOptions {
@@ -66,46 +69,88 @@ func WithDNS(dnsChina, dnsAbroad []string) ServerOption {
 	}
 }
 
-func WithGFWFile(addr []string) ServerOption {
+//func WithGFWFile(addr []string) ServerOption {
+//	return func(o *serverOptions) error {
+//		gfw, err := gfwlist.NewFromFiles(addr, false)
+//		if err != nil {
+//			return err
+//		}
+//		o.gfwlist = gfw
+//		return nil
+//	}
+//}
+
+func WithCHNFile(paths []string) ServerOption {
 	return func(o *serverOptions) error {
-		gfw, err := gfwlist.NewFromFiles(addr, false)
-		if err != nil {
-			return err
+		if len(paths) == 0 {
+			return fmt.Errorf("empty for China route list")
 		}
-		o.gfwlist = gfw
+
+		for _, path := range paths {
+			err := addCHNFile(o, path)
+			if err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 }
 
-func WithCHNFile(path string) ServerOption {
+func addCHNFile(o *serverOptions, path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("fail to open China route list: %w", err)
+
+	}
+	defer file.Close()
+
+	if o.ChinaCIDR == nil {
+		o.ChinaCIDR = cidranger.NewPCTrieRanger()
+	}
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		_, network, err := net.ParseCIDR(scanner.Text())
+		if err != nil {
+			return fmt.Errorf("parse %s as CIDR failed: %v", scanner.Text(), err.Error())
+		}
+		err = o.ChinaCIDR.Insert(cidranger.NewBasicRangerEntry(*network))
+		if err != nil {
+			return fmt.Errorf("insert %s as CIDR failed: %v", scanner.Text(), err.Error())
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("fail to scan china route list: %v", err.Error())
+	}
+	return nil
+}
+
+func WithChnDomain(path string) ServerOption {
 	return func(o *serverOptions) error {
 		if path == "" {
-			return fmt.Errorf("empty for China route list")
+			return fmt.Errorf("empty for China domain list")
 		}
-		file, err := os.Open(path)
+
+		m, err := matcher.New("combine", path)
 		if err != nil {
-			return fmt.Errorf("fail to open China route list: %w", err)
+			return err
+		}
+		o.chnDomainMatcher = m
+		return nil
+	}
+}
 
+func WithGfwDomain(path string) ServerOption {
+	return func(o *serverOptions) error {
+		if path == "" {
+			return fmt.Errorf("empty for Gfw domain list")
 		}
-		defer file.Close()
 
-		if o.ChinaCIDR == nil {
-			o.ChinaCIDR = cidranger.NewPCTrieRanger()
+		m, err := matcher.New("combine", path)
+		if err != nil {
+			return err
 		}
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			_, network, err := net.ParseCIDR(scanner.Text())
-			if err != nil {
-				return fmt.Errorf("parse %s as CIDR failed: %v", scanner.Text(), err.Error())
-			}
-			err = o.ChinaCIDR.Insert(cidranger.NewBasicRangerEntry(*network))
-			if err != nil {
-				return fmt.Errorf("insert %s as CIDR failed: %v", scanner.Text(), err.Error())
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			return fmt.Errorf("fail to scan china route list: %v", err.Error())
-		}
+		o.gfwDomainMatcher = m
 		return nil
 	}
 }

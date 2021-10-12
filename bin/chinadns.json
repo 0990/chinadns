@@ -12,6 +12,11 @@
       "8.8.8.8",
       "1.1.1.1"
    ],
-   "chn_path": "chnroute.txt",
+   "chn_ip": [
+      "chnroute.txt",
+      "chnroute-v6.txt"
+   ],
+   "chn_domain": "chinalist.txt",
+   "gfw_domain": "gfwlist.txt",
    "log_level": "debug"
 }

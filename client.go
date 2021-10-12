@@ -56,8 +56,6 @@ func (c *Client) lookup(reqID uint32, req *dns.Msg, server *Resolver) (reply *dn
 				return
 			}
 
-			logger.WithError(err).Error("Fail to send UDP query.")
-
 			if reply != nil && reply.Truncated {
 				logger.Error("Truncated msg received.Conder enlarge your UDP max size")
 			}

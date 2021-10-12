@@ -28,8 +28,10 @@ type DefaultHook struct {
 }
 
 func NewDefaultHook(name string, maxSize int) *DefaultHook {
-	formatter := &logrus.JSONFormatter{
+	formatter := &logrus.TextFormatter{
+		DisableColors:    true,
 		DisableTimestamp: false,
+		TimestampFormat:  "2006-01-02 15:04:05",
 	}
 
 	writer := &lumberjack.Logger{
