@@ -68,7 +68,7 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	//	return
 	//}
 
-	s.normalizeRequest(req)
+	//s.normalizeRequest(req)
 
 	//国内域名直接走国内dns
 	if s.chnDomainMatcher.IsMatch(reqDomain) {
