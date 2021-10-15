@@ -68,7 +68,7 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	//	return
 	//}
 
-	//s.normalizeRequest(req)
+	s.normalizeRequest(req)
 
 	//国内域名直接走国内dns
 	if s.chnDomainMatcher.IsMatch(reqDomain) {
@@ -259,7 +259,7 @@ func lookupInServers(reqID uint32, req *dns.Msg, servers []*Resolver, waitInterv
 		go doLookup(server)
 	}
 
-	done := make(chan struct{}, 0)
+	done := make(chan struct{}, 1)
 
 	go func() {
 		wg.Wait()

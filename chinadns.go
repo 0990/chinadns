@@ -14,5 +14,6 @@ type Config struct {
 	ChnDomain string   `json:"chn_domain"`
 	GfwDomain string   `json:"gfw_domain"`
 
-	LogLevel string `json:"log_level"`
+	LogLevel  string `json:"log_level"`
+	PProfPort int    `json:"pprof_port"`
 }

@@ -7,6 +7,8 @@ import (
 	"github.com/0990/chinadns"
 	"github.com/0990/chinadns/logconfig"
 	"github.com/sirupsen/logrus"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"time"
@@ -34,6 +36,15 @@ func main() {
 	if err != nil {
 		logrus.Fatalln(err)
 	}
+
+	go func() {
+		if cfg.PProfPort > 0 {
+			err := http.ListenAndServe(fmt.Sprintf("0.0.0.0:%d", cfg.PProfPort), nil)
+			if err != nil {
+				logrus.Fatalln(err)
+			}
+		}
+	}()
 
 	logconfig.InitLogrus("chinadns", 10, level)
 
