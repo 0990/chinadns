@@ -31,8 +31,8 @@ func NewServer(cli *Client, opts ...ServerOption) (*Server, error) {
 	s := &Server{
 		serverOptions: o,
 		Client:        cli,
-		UDPServer:     &dns.Server{Addr: o.Listen, Net: "udp4", ReusePort: true},
-		TCPServer:     &dns.Server{Addr: o.Listen, Net: "tcp4", ReusePort: true},
+		UDPServer:     &dns.Server{Addr: o.Listen, Net: "udp", ReusePort: true},
+		TCPServer:     &dns.Server{Addr: o.Listen, Net: "tcp", ReusePort: true},
 		cache:         newDNSCache(o.CacheExpireSec),
 	}
 
@@ -45,8 +45,12 @@ func NewServer(cli *Client, opts ...ServerOption) (*Server, error) {
 func (s *Server) Run() error {
 	logrus.Info("Start server at ", s.Listen)
 	eg, _ := errgroup.WithContext(context.Background())
-	eg.Go(s.UDPServer.ListenAndServe)
-	eg.Go(s.TCPServer.ListenAndServe)
+	eg.Go(func() error {
+		return runUDPServer(s.UDPServer)
+	})
+	eg.Go(func() error {
+		return runTCPServer(s.TCPServer)
+	})
 	return eg.Wait()
 }
 

@@ -5,14 +5,10 @@
    "cache_expire_sec": 0,
    "gfw_path": ["gfwlist.txt","gfwuser.txt"],
    "dns-china": [
-      "114.114.114.114",
-      "10.229.1.1"
+      "tcp@114.114.114.114"
    ],
    "dns-abroad": [
-      "doh@https://9.9.9.9/dns-query",
-      "doh@https://dns.alidns.com/dns-query",
-      "doh@https://dns.google/dns-query"
-
+      "tcp@8.8.8.8"
    ],
    "chn_ip": [
       "chnroute.txt",
