@@ -31,8 +31,8 @@ func NewServer(cli *Client, opts ...ServerOption) (*Server, error) {
 	s := &Server{
 		serverOptions: o,
 		Client:        cli,
-		UDPServer:     &dns.Server{Addr: o.Listen, Net: "udp4"},
-		TCPServer:     &dns.Server{Addr: o.Listen, Net: "tcp4"},
+		UDPServer:     &dns.Server{Addr: o.Listen, Net: "udp4", ReusePort: true},
+		TCPServer:     &dns.Server{Addr: o.Listen, Net: "tcp4", ReusePort: true},
 		cache:         newDNSCache(o.CacheExpireSec),
 	}
 
