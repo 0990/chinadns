@@ -22,8 +22,8 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	reqID := s.newID()
 
 	logger := logrus.WithFields(logrus.Fields{
-		"question": questionString(&req.Question[0]),
-		"id":       reqID,
+		"q":  questionString(&req.Question[0]),
+		"id": reqID,
 	})
 
 	start := time.Now()
@@ -31,14 +31,15 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	var err error
 	var lookupRet *LookupResult
 
-	//var fromCache bool
+	var hitCache bool
 
-	reqDomain := reqDomain(req)
+	question := req.Question[0]
 
 	defer func() {
-		//if !fromCache && lookupRet != nil {
-		//	s.cache.Set(reqDomain, lookupRet.reply)
-		//}
+		if !hitCache && lookupRet != nil {
+			s.cache.Set(question, lookupRet)
+		}
+
 		if lookupRet == nil {
 			logger.Warn("reply==nil")
 			reply := new(dns.Msg)
@@ -53,20 +54,27 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		replyRet := replyString(lookupRet.reply)
 
 		logger.WithFields(logrus.Fields{
-			"RTT":    timeSinceMS(start),
-			"server": lookupRet.resolver,
-			"reply":  replyRet,
-			"detail": lookupRet.reply.String(),
+			"RTT":      timeSinceMS(start),
+			"server":   lookupRet.resolver,
+			"reply":    replyRet,
+			"z":        lookupRet.reply.String(),
+			"hitCache": hitCache,
 		}).Debug("DNS reply")
 	}()
 
-	//if v, ok := s.cache.Get(reqDomain); ok {
-	//	fromCache = true
-	//	reply = v
-	//	reply.Id = req.Id
-	//	logger.Debug("Cache HIT")
-	//	return
-	//}
+	if v, ok := s.cache.Get(question); ok {
+		hitCache = true
+
+		reply := v.reply.Copy()
+		reply.Id = req.Id
+		lookupRet = &LookupResult{
+			reply:    reply,
+			resolver: v.resolver,
+		}
+		return
+	}
+
+	reqDomain := reqDomain(req)
 
 	s.normalizeRequest(req)
 

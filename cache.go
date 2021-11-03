@@ -7,8 +7,8 @@ import (
 )
 
 type DNSCache interface {
-	Set(domain string, msg *dns.Msg)
-	Get(domain string) (*dns.Msg, bool)
+	Set(q dns.Question, msg *LookupResult)
+	Get(q dns.Question) (*LookupResult, bool)
 	Len() int
 }
 
@@ -16,12 +16,12 @@ const DNSCache_TriggerGCCount = 1000
 
 type dnsCache struct {
 	sync.RWMutex
-	cache     map[string]dnsCacheV
+	cache     map[dns.Question]dnsCacheV
 	expireSec int64
 }
 
 type dnsCacheV struct {
-	msg         dns.Msg
+	lr          *LookupResult
 	createdTime time.Time
 }
 
@@ -32,31 +32,31 @@ func newDNSCache(expireSec int64) DNSCache {
 
 	return &dnsCache{
 		RWMutex:   sync.RWMutex{},
-		cache:     make(map[string]dnsCacheV),
+		cache:     make(map[dns.Question]dnsCacheV),
 		expireSec: expireSec,
 	}
 }
 
-func (p *dnsCache) Set(domain string, msg *dns.Msg) {
-	p.set(domain, msg)
+func (p *dnsCache) Set(q dns.Question, lr *LookupResult) {
+	p.set(q, lr)
 	p.checkGC()
 }
 
-func (p *dnsCache) set(domain string, msg *dns.Msg) {
+func (p *dnsCache) set(q dns.Question, lr *LookupResult) {
 	p.Lock()
 	defer p.Unlock()
 
-	p.cache[domain] = dnsCacheV{
-		msg:         *msg,
+	p.cache[q] = dnsCacheV{
+		lr:          lr,
 		createdTime: time.Now(),
 	}
 }
 
-func (p *dnsCache) Get(domain string) (*dns.Msg, bool) {
+func (p *dnsCache) Get(q dns.Question) (*LookupResult, bool) {
 	p.RLock()
 	defer p.RUnlock()
 
-	v, ok := p.cache[domain]
+	v, ok := p.cache[q]
 	if !ok {
 		return nil, false
 	}
@@ -65,7 +65,7 @@ func (p *dnsCache) Get(domain string) (*dns.Msg, bool) {
 		return nil, false
 	}
 
-	return &v.msg, true
+	return v.lr, true
 }
 
 func (p *dnsCache) Len() int {
@@ -100,11 +100,11 @@ func (p *dnsCache) isExpire(dnsCacheV dnsCacheV, now time.Time) bool {
 type dnsCacheNone struct {
 }
 
-func (p *dnsCacheNone) Set(domain string, msg *dns.Msg) {
+func (p *dnsCacheNone) Set(q dns.Question, lr *LookupResult) {
 	return
 }
 
-func (p *dnsCacheNone) Get(domain string) (*dns.Msg, bool) {
+func (p *dnsCacheNone) Get(q dns.Question) (*LookupResult, bool) {
 	return nil, false
 }
 

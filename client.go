@@ -60,7 +60,7 @@ func (c *Client) lookup(reqID uint32, req *dns.Msg, server *Resolver) (reply *dn
 				logger.Error("Truncated msg received.Conder enlarge your UDP max size")
 			}
 		case "tcp":
-			logger.Debug("Query upstream tcp")
+			//logger.Debug("Query upstream tcp")
 			reply, rtt0, err = c.TCPCli.Exchange(req, server.GetAddr())
 			if err == nil {
 				return
@@ -68,7 +68,7 @@ func (c *Client) lookup(reqID uint32, req *dns.Msg, server *Resolver) (reply *dn
 			rtt += rtt0
 			logger.WithError(err).Error("Fail to send TCP query.")
 		case "doh":
-			logger.Debug("Query upstream doh")
+			//logger.Debug("Query upstream doh")
 			reply, rtt, err = c.DoHCli.Exchange(req, server.GetAddr())
 			if err == nil {
 				return
