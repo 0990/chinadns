@@ -57,7 +57,7 @@ func main() {
 		chinadns.WithListenAddr(cfg.Listen),
 		chinadns.WithCacheExpireSec(cfg.CacheExpireSec),
 		chinadns.WithDNS(cfg.DNSChina, cfg.DNSAbroad),
-		//chinadns.WithGFWFile(cfg.GFWPath),
+		chinadns.WithDomain2IP(cfg.Domain2IP),
 		chinadns.WithCHNFile(cfg.ChnIP),
 		chinadns.WithChnDomain(cfg.ChnDomain),
 		chinadns.WithGfwDomain(cfg.GfwDomain),

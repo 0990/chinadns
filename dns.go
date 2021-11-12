@@ -2,6 +2,7 @@ package chinadns
 
 import (
 	"errors"
+	"fmt"
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
 	"net"
@@ -55,12 +56,32 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 		logger.WithFields(logrus.Fields{
 			"RTT":      timeSinceMS(start),
-			"server":   lookupRet.resolver,
+			"resolver": lookupRet.resolver,
 			"reply":    replyRet,
 			"z":        lookupRet.reply.String(),
 			"hitCache": hitCache,
 		}).Debug("DNS reply")
 	}()
+
+	reqDomain := reqDomain(req)
+
+	if v, ok := s.Domain2IP.Load(reqDomain); ok && req.Question[0].Qtype == dns.TypeA {
+		ip := v.(string)
+		reply := new(dns.Msg)
+		reply.SetReply(req)
+		s := fmt.Sprintf("%s. IN 3600 A %s", reqDomain, ip)
+		rr, err := dns.NewRR(s)
+		if err != nil {
+			logger.WithField("rr", s).WithError(err).Error("dns.NewRR")
+			return
+		}
+		reply.Answer = []dns.RR{rr}
+		lookupRet = &LookupResult{
+			reply:    reply,
+			resolver: nil,
+		}
+		return
+	}
 
 	if v, ok := s.cache.Get(question); ok {
 		hitCache = true
@@ -74,8 +95,6 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 
-	reqDomain := reqDomain(req)
-
 	s.normalizeRequest(req)
 
 	//国内域名直接走国内dns
@@ -87,9 +106,9 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		}
 
 		logger.WithFields(logrus.Fields{
-			"RTT":    timeSinceMS(start),
-			"server": lookupRet.resolver,
-			"reply":  replyString(lookupRet.reply),
+			"RTT":      timeSinceMS(start),
+			"resolver": lookupRet.resolver,
+			"reply":    replyString(lookupRet.reply),
 		}).Debug("Query result")
 		return
 	}
@@ -103,9 +122,9 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		}
 
 		logger.WithFields(logrus.Fields{
-			"RTT":    timeSinceMS(start),
-			"server": lookupRet.resolver,
-			"reply":  replyString(lookupRet.reply),
+			"RTT":      timeSinceMS(start),
+			"resolver": lookupRet.resolver,
+			"reply":    replyString(lookupRet.reply),
 		}).Debug("Query result")
 		return
 	}
@@ -127,9 +146,9 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	logger.WithFields(logrus.Fields{
-		"RTT":    timeSinceMS(start),
-		"server": lookupRet.resolver,
-		"reply":  replyString(lookupRet.reply),
+		"RTT":      timeSinceMS(start),
+		"resolver": lookupRet.resolver,
+		"reply":    replyString(lookupRet.reply),
 	}).Debug("Query result")
 
 	//使用国内dns但返回的是国外ip,则用国外dns的查询结果
@@ -138,9 +157,9 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		select {
 		case lookupRet = <-lookupRetAbroad:
 			logger.WithFields(logrus.Fields{
-				"RTT":    timeSinceMS(start),
-				"server": lookupRet.resolver,
-				"reply":  replyString(lookupRet.reply),
+				"RTT":      timeSinceMS(start),
+				"resolver": lookupRet.resolver,
+				"reply":    replyString(lookupRet.reply),
 			}).Debug("Query result")
 			return
 		case <-time.After(time.Second * 3):
@@ -246,7 +265,7 @@ func lookupInServers(reqID uint32, req *dns.Msg, servers []*Resolver, waitInterv
 		reply, rtt, err := lookup(reqID, req.Copy(), server)
 		if err != nil {
 			logrus.WithFields(logrus.Fields{
-				"server":   server,
+				"resolver": server,
 				"question": questionString(&req.Question[0]),
 				"RTT":      int64(rtt / time.Millisecond),
 			}).WithError(err).Error("lookup")

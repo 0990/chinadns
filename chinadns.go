@@ -6,7 +6,8 @@ type Config struct {
 	Timeout        int    `json:"timeout"`          //查询超时时间
 	CacheExpireSec int    `json:"cache_expire_sec"` //缓存超时时间
 
-	//GFWPath   []string `json:"gfw_path"`
+	Domain2IP map[string]string `json:"domain2ip"` //自定义dns
+
 	DNSChina  []string `json:"dns-china"`  //国内dns
 	DNSAbroad []string `json:"dns-abroad"` //海外dns,可信dns
 

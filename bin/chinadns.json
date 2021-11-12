@@ -2,13 +2,16 @@
    "listen": "0.0.0.0:65353",
    "udp-max-bytes": 4096,
    "timeout": 2,
-   "cache_expire_sec": 0,
+   "cache_expire_sec": 60,
+   "domain2ip": {
+      "a.b.c": "127.0.0.1"
+   },
    "gfw_path": ["gfwlist.txt","gfwuser.txt"],
    "dns-china": [
-      "tcp@114.114.114.114"
+      "114.114.114.114"
    ],
    "dns-abroad": [
-      "tcp@8.8.8.8"
+      "doh@https://9.9.9.9/dns-query"
    ],
    "chn_ip": [
       "chnroute.txt",

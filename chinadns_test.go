@@ -15,6 +15,9 @@ func Test_CreateConfig(t *testing.T) {
 		DNSChina:    []string{"114.114.114.114"},
 		DNSAbroad:   []string{"8.8.8.8"},
 		LogLevel:    "debug",
+		Domain2IP: map[string]string{
+			"a.b": "127.0.0.1",
+		},
 	}
 
 	c, _ := json.MarshalIndent(cfg, "", "   ")

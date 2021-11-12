@@ -7,6 +7,7 @@ import (
 	"github.com/yl2chen/cidranger"
 	"net"
 	"os"
+	"sync"
 )
 
 // ServerOption provides ChinaDNS server options. Please use WithXXX functions to generate Options.
@@ -17,10 +18,11 @@ type serverOptions struct {
 
 	CacheExpireSec int64
 
+	Domain2IP sync.Map
+
 	DNSChinaServers  resolverList // DNS servers which can be trusted
 	DNSAbroadServers resolverList // DNS servers which may return polluted results
 
-	//gfwlist   *gfwlist.GFWList
 	ChinaCIDR cidranger.Ranger
 
 	chnDomainMatcher matcher.Matcher
@@ -43,6 +45,15 @@ func WithListenAddr(addr string) ServerOption {
 func WithCacheExpireSec(sec int) ServerOption {
 	return func(o *serverOptions) error {
 		o.CacheExpireSec = int64(sec)
+		return nil
+	}
+}
+
+func WithDomain2IP(domain2ip map[string]string) ServerOption {
+	return func(o *serverOptions) error {
+		for k, v := range domain2ip {
+			o.Domain2IP.Store(k, v)
+		}
 		return nil
 	}
 }
