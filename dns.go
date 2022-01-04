@@ -68,17 +68,7 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 	reqDomain := reqDomain(req)
 
-	if v, ok := s.Domain2IP.Load(reqDomain); ok && req.Question[0].Qtype == dns.TypeA {
-		ip := v.(string)
-		reply := new(dns.Msg)
-		reply.SetReply(req)
-		s := fmt.Sprintf("%s. IN 3600 A %s", reqDomain, ip)
-		rr, err := dns.NewRR(s)
-		if err != nil {
-			logger.WithField("rr", s).WithError(err).Error("dns.NewRR")
-			return
-		}
-		reply.Answer = []dns.RR{rr}
+	if reply, ok := s.lookUpInLocal(reqID, reqDomain, req); ok {
 		lookupRet = &LookupResult{
 			reply:    reply,
 			resolver: nil,
@@ -169,6 +159,79 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 			return
 		}
 	}
+}
+
+func isIPV4(ip string) bool {
+	return net.ParseIP(ip).To4() != nil
+}
+
+func getIPV4(vs []string) (ret []string) {
+	for _, v := range vs {
+		if isIPV4(v) {
+			ret = append(ret, v)
+		}
+	}
+	return
+}
+
+func getIPV6(vs []string) (ret []string) {
+	for _, v := range vs {
+		if !isIPV4(v) {
+			ret = append(ret, v)
+		}
+	}
+	return
+}
+
+//查找自定义域名
+func (s *Server) lookUpInLocal(reqID uint32, domain string, req *dns.Msg) (*dns.Msg, bool) {
+	ret, ok := s.Domain2IP.Load(domain)
+	if !ok {
+		return nil, false
+	}
+
+	logger := logrus.WithFields(logrus.Fields{
+		"q":  questionString(&req.Question[0]),
+		"id": reqID,
+	})
+
+	qType := req.Question[0].Qtype
+
+	allIPs := strings.Split(ret.(string), ";")
+
+	var useIPs []string
+	var format string
+	switch qType {
+	case dns.TypeA:
+		useIPs = getIPV4(allIPs)
+		format = "%s. IN 3600 A %s"
+	case dns.TypeAAAA:
+		useIPs = getIPV6(allIPs)
+		format = "%s. IN 3600 AAAA %s"
+	default:
+		return nil, false
+	}
+
+	if len(useIPs) == 0 {
+		return nil, false
+	}
+
+	var rrs []dns.RR
+	for _, ip := range useIPs {
+		s := fmt.Sprintf(format, domain, ip)
+		rr, err := dns.NewRR(s)
+		if err != nil {
+			logger.WithField("rr", s).WithError(err).Error("dns.NewRR")
+			return nil, false
+		}
+		rrs = append(rrs, rr)
+	}
+
+	reply := new(dns.Msg)
+	reply.SetReply(req)
+	reply.Answer = rrs
+
+	return reply, true
 }
 
 func reqDomain(request *dns.Msg) string {

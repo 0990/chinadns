@@ -4,7 +4,7 @@
    "timeout": 2,
    "cache_expire_sec": 60,
    "domain2ip": {
-      "a.b.c": "127.0.0.1"
+      "a.b": "127.0.0.1;2404:6800:4005:80c::200e"
    },
    "gfw_path": ["gfwlist.txt","gfwuser.txt"],
    "dns-china": [
