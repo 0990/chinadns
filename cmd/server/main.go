@@ -11,15 +11,22 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"time"
 )
 
 var confFile = flag.String("c", "chinadns.json", "config file")
+var workingDir = flag.String("w", "", "working dir")
 
 func main() {
 	flag.Parse()
 
-	file, err := os.Open(*confFile)
+	cfgFile := *confFile
+	if *workingDir != "" {
+		cfgFile = *workingDir + "/" + cfgFile
+	}
+
+	file, err := os.Open(cfgFile)
 	if err != nil {
 		logrus.Fatalln(err)
 	}
@@ -28,6 +35,17 @@ func main() {
 	err = json.NewDecoder(file).Decode(&cfg)
 	if err != nil {
 		logrus.Fatalln(err)
+	}
+
+	var logName = "chinadns"
+
+	if *workingDir != "" {
+		cfg.ChnDomain = filepath.Join(*workingDir, cfg.ChnDomain)
+		cfg.GfwDomain = filepath.Join(*workingDir, cfg.GfwDomain)
+		for i, v := range cfg.ChnIP {
+			cfg.ChnIP[i] = filepath.Join(*workingDir, v)
+		}
+		logName = filepath.Join(*workingDir, logName)
 	}
 
 	logrus.Info("config:", cfg)
@@ -46,7 +64,7 @@ func main() {
 		}
 	}()
 
-	logconfig.InitLogrus("chinadns", 10, level)
+	logconfig.InitLogrus(logName, 10, level)
 
 	copts := []chinadns.ClientOption{
 		chinadns.WithUDPMaxBytes(cfg.UDPMaxBytes),
