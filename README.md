@@ -46,9 +46,9 @@
 #### cache_expire_sec
 dns缓存时间（秒），当<=0代表不启用dns缓存
 #### domain2ip
-自定义域名解析（支持ipv6)，格式为 "域名":"ip1;ip2;ip3"<br>
-可禁用特定域名的ipv4解析，将ip配置为0:0:0:0<br>
-可禁用特定域名的ipv6解析,将ip配置为0:0:0:0:0:0:0:0或者::<br>
+自定义域名解析（支持ipv6)，格式为 "域名":"ip1;ip2;ip3",当ip配置为<br>
+0:0:0:0,代表禁用ipv4解析<br>
+0:0:0:0:0:0:0:0或者::,代表禁用ipv6解析<br>
 禁用后，返回的answer域为空
 #### dns-china dns-abroad
 国内外上游dns服务器，格式为protocol@ip:port,可省略为ip<br>
