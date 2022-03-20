@@ -165,6 +165,10 @@ func isIPV4(ip string) bool {
 	return net.ParseIP(ip).To4() != nil
 }
 
+func isIPV6(ip string) bool {
+	return net.ParseIP(ip).To16() != nil
+}
+
 func getIPV4(vs []string) (ret []string) {
 	for _, v := range vs {
 		if isIPV4(v) {
@@ -176,7 +180,7 @@ func getIPV4(vs []string) (ret []string) {
 
 func getIPV6(vs []string) (ret []string) {
 	for _, v := range vs {
-		if !isIPV4(v) {
+		if isIPV6(v) {
 			ret = append(ret, v)
 		}
 	}
@@ -217,14 +221,17 @@ func (s *Server) lookUpInLocal(reqID uint32, domain string, req *dns.Msg) (*dns.
 	}
 
 	var rrs []dns.RR
-	for _, ip := range useIPs {
-		s := fmt.Sprintf(format, domain, ip)
-		rr, err := dns.NewRR(s)
-		if err != nil {
-			logger.WithField("rr", s).WithError(err).Error("dns.NewRR")
-			return nil, false
+
+	if !isAnswerNil(useIPs) {
+		for _, ip := range useIPs {
+			s := fmt.Sprintf(format, domain, ip)
+			rr, err := dns.NewRR(s)
+			if err != nil {
+				logger.WithField("rr", s).WithError(err).Error("dns.NewRR")
+				return nil, false
+			}
+			rrs = append(rrs, rr)
 		}
-		rrs = append(rrs, rr)
 	}
 
 	reply := new(dns.Msg)
@@ -232,6 +239,20 @@ func (s *Server) lookUpInLocal(reqID uint32, domain string, req *dns.Msg) (*dns.
 	reply.Answer = rrs
 
 	return reply, true
+}
+
+func isAnswerNil(ips []string) bool {
+	if len(ips) != 1 {
+		return false
+	}
+
+	ip := ips[0]
+	switch ip {
+	case "::", "0:0:0:0:0:0:0:0", "0.0.0.0":
+		return true
+	default:
+		return false
+	}
 }
 
 func reqDomain(request *dns.Msg) string {
