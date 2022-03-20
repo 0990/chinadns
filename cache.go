@@ -26,7 +26,7 @@ type dnsCacheV struct {
 }
 
 func newDNSCache(expireSec int64) DNSCache {
-	if expireSec == 0 {
+	if expireSec <= 0 {
 		return &dnsCacheNone{}
 	}
 
