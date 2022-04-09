@@ -18,7 +18,8 @@ type serverOptions struct {
 
 	CacheExpireSec int64
 
-	Domain2IP sync.Map
+	Domain2IP   sync.Map
+	Domain2Attr sync.Map
 
 	DNSChinaServers  resolverList // DNS servers which can be trusted
 	DNSAbroadServers resolverList // DNS servers which may return polluted results
@@ -53,6 +54,15 @@ func WithDomain2IP(domain2ip map[string]string) ServerOption {
 	return func(o *serverOptions) error {
 		for k, v := range domain2ip {
 			o.Domain2IP.Store(k, v)
+		}
+		return nil
+	}
+}
+
+func WithDomain2Attr(domain2attr map[string]string) ServerOption {
+	return func(o *serverOptions) error {
+		for k, v := range domain2attr {
+			o.Domain2Attr.Store(k, v)
 		}
 		return nil
 	}

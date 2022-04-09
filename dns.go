@@ -36,7 +36,13 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 	question := req.Question[0]
 
+	reqDomain := reqDomain(req)
+
 	defer func() {
+		if attrs := s.getDomainAttr(reqDomain); len(attrs) > 0 {
+			filterLookupRetByAttrs(lookupRet, attrs)
+		}
+
 		if !hitCache && lookupRet != nil {
 			replyRet := replyString(lookupRet.reply)
 			if replyRet != "" {
@@ -66,9 +72,8 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		}).Debug("DNS reply")
 	}()
 
-	reqDomain := reqDomain(req)
-
-	if reply, ok := s.lookUpInLocal(reqID, reqDomain, req); ok {
+	//自定义域名中查找
+	if reply, ok := s.lookUpInCustom(reqID, reqDomain, req); ok {
 		lookupRet = &LookupResult{
 			reply:    reply,
 			resolver: nil,
@@ -188,7 +193,7 @@ func getIPV6(vs []string) (ret []string) {
 }
 
 //查找自定义域名
-func (s *Server) lookUpInLocal(reqID uint32, domain string, req *dns.Msg) (*dns.Msg, bool) {
+func (s *Server) lookUpInCustom(reqID uint32, domain string, req *dns.Msg) (*dns.Msg, bool) {
 	ret, ok := s.Domain2IP.Load(domain)
 	if !ok {
 		return nil, false
