@@ -40,8 +40,14 @@ func main() {
 	var logName = "logs/chinadns"
 
 	if *workingDir != "" {
-		cfg.ChnDomain = filepath.Join(*workingDir, cfg.ChnDomain)
-		cfg.GfwDomain = filepath.Join(*workingDir, cfg.GfwDomain)
+		for i, v := range cfg.ChnDomain {
+			cfg.ChnDomain[i] = filepath.Join(*workingDir, v)
+		}
+
+		for i, v := range cfg.GfwDomain {
+			cfg.GfwDomain[i] = filepath.Join(*workingDir, v)
+		}
+
 		for i, v := range cfg.ChnIP {
 			cfg.ChnIP[i] = filepath.Join(*workingDir, v)
 		}

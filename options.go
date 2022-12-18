@@ -153,13 +153,14 @@ func addCHNFile(o *serverOptions, path string) error {
 	return nil
 }
 
-func WithChnDomain(path string) ServerOption {
+func WithChnDomain(paths []string) ServerOption {
 	return func(o *serverOptions) error {
-		if path == "" {
-			return fmt.Errorf("empty for China domain list")
+
+		if len(paths) == 0 {
+			return fmt.Errorf("empty for Gfw domain list")
 		}
 
-		m, err := matcher.New("combine", path)
+		m, err := matcher.New("test", paths...)
 		if err != nil {
 			return err
 		}
@@ -168,13 +169,13 @@ func WithChnDomain(path string) ServerOption {
 	}
 }
 
-func WithGfwDomain(path string) ServerOption {
+func WithGfwDomain(paths []string) ServerOption {
 	return func(o *serverOptions) error {
-		if path == "" {
+		if len(paths) == 0 {
 			return fmt.Errorf("empty for Gfw domain list")
 		}
 
-		m, err := matcher.New("combine", path)
+		m, err := matcher.New("test", paths...)
 		if err != nil {
 			return err
 		}
