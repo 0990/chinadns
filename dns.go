@@ -39,10 +39,6 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	reqDomain := reqDomain(req)
 
 	defer func() {
-		if attrs := s.getDomainAttr(reqDomain); len(attrs) > 0 {
-			filterLookupRetByAttrs(lookupRet, attrs)
-		}
-
 		if !hitCache && lookupRet != nil {
 			replyRet := replyString(lookupRet.reply)
 			if replyRet != "" {
@@ -57,6 +53,10 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 			lookupRet = &LookupResult{reply: reply}
 		}
+		var filter bool
+		if attrs := s.getResolverAttr(lookupRet.resolver); len(attrs) > 0 {
+			filter = filterLookupRetByAttrs(lookupRet, attrs)
+		}
 		// https://github.com/miekg/dns/issues/216
 		lookupRet.reply.Compress = true
 		_ = w.WriteMsg(lookupRet.reply)
@@ -67,8 +67,9 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 			"RTT":      timeSinceMS(start),
 			"resolver": lookupRet.resolver,
 			"reply":    replyRet,
-			"z":        lookupRet.reply.String(),
-			"hitCache": hitCache,
+			"filter":   filter,
+			//"z":        lookupRet.reply.String(),
+			"cache": hitCache,
 		}).Debug("DNS reply")
 	}()
 

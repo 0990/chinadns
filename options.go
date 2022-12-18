@@ -7,6 +7,7 @@ import (
 	"github.com/yl2chen/cidranger"
 	"net"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -18,11 +19,12 @@ type serverOptions struct {
 
 	CacheExpireSec int64
 
-	Domain2IP   sync.Map
-	Domain2Attr sync.Map
+	Domain2IP sync.Map
 
 	DNSChinaServers  resolverList // DNS servers which can be trusted
 	DNSAbroadServers resolverList // DNS servers which may return polluted results
+
+	DNSAbroadAttr []DomainAttr
 
 	ChinaCIDR cidranger.Ranger
 
@@ -59,11 +61,16 @@ func WithDomain2IP(domain2ip map[string]string) ServerOption {
 	}
 }
 
-func WithDomain2Attr(domain2attr map[string]string) ServerOption {
+func WithDNSAboardAttr(attr string) ServerOption {
 	return func(o *serverOptions) error {
-		for k, v := range domain2attr {
-			o.Domain2Attr.Store(k, v)
+		attrs := strings.Split(attr, ";")
+
+		var domainAttrs []DomainAttr
+		for _, v := range attrs {
+			domainAttrs = append(domainAttrs, toDomainAttr(v))
 		}
+
+		o.DNSAbroadAttr = domainAttrs
 		return nil
 	}
 }

@@ -2,7 +2,6 @@ package chinadns
 
 import (
 	"github.com/miekg/dns"
-	"strings"
 )
 
 type DomainAttr int
@@ -12,47 +11,62 @@ const (
 	DomainAttr_NO_CNAME
 	DomainAttr_NO_IPV4
 	DomainAttr_NO_IPV6
+	DomainAttr_NO_HTTPS
 )
 
-func (s *Server) getDomainAttr(domain string) (ret []DomainAttr) {
-	attr, ok := s.Domain2Attr.Load(domain)
-	if !ok {
+func (s *Server) isAboardResolver(r *Resolver) bool {
+	for _, v := range s.DNSAbroadServers {
+		if r == v {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Server) getResolverAttr(resolver *Resolver) (ret []DomainAttr) {
+	if resolver == nil {
 		return nil
 	}
-
-	attrs := strings.Split(attr.(string), ";")
-	for _, v := range attrs {
-		ret = append(ret, toDomainAttr(v))
+	if s.isAboardResolver(resolver) {
+		return s.DNSAbroadAttr
 	}
-	return ret
+
+	return nil
 }
 
-func filterLookupRetByAttrs(ret *LookupResult, attrs []DomainAttr) {
+func filterLookupRetByAttrs(ret *LookupResult, attrs []DomainAttr) bool {
 	if ret == nil {
-		return
+		return false
 	}
 
+	var filter bool
 	for _, v := range attrs {
-		filterLookupRetByAttr(ret, v)
+		if filterLookupRetByAttr(ret, v) {
+			filter = true
+		}
 	}
+
+	return filter
 }
 
-func filterLookupRetByAttr(ret *LookupResult, attr DomainAttr) {
+func filterLookupRetByAttr(ret *LookupResult, attr DomainAttr) bool {
 	if ret == nil {
-		return
+		return false
 	}
 
 	if attr == DomainAttr_Invalid {
-		return
+		return false
 	}
-
+	var del bool
 	for i := 0; i < len(ret.reply.Answer); {
 		if domainAttr2RType(attr) == ret.reply.Answer[i].Header().Rrtype {
 			ret.reply.Answer = append(ret.reply.Answer[:i], ret.reply.Answer[i+1:]...)
+			del = true
 		} else {
 			i++
 		}
 	}
+	return del
 }
 
 func domainAttr2RType(attr DomainAttr) uint16 {
@@ -63,6 +77,8 @@ func domainAttr2RType(attr DomainAttr) uint16 {
 		return dns.TypeA
 	case DomainAttr_NO_IPV6:
 		return dns.TypeAAAA
+	case DomainAttr_NO_HTTPS:
+		return dns.TypeHTTPS
 	default:
 		return dns.TypeNone
 	}
@@ -76,6 +92,8 @@ func toDomainAttr(s string) DomainAttr {
 		return DomainAttr_NO_IPV4
 	case "noipv6":
 		return DomainAttr_NO_IPV6
+	case "nohttps":
+		return DomainAttr_NO_HTTPS
 	default:
 		return DomainAttr_Invalid
 	}
