@@ -37,7 +37,7 @@ func main() {
 		logrus.Fatalln(err)
 	}
 
-	var logName = "chinadns"
+	var logName = "logs/chinadns"
 
 	if *workingDir != "" {
 		cfg.ChnDomain = filepath.Join(*workingDir, cfg.ChnDomain)

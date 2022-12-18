@@ -37,8 +37,8 @@ func NewDefaultHook(name string, maxSize int) *DefaultHook {
 	writer := &lumberjack.Logger{
 		Filename:   fmt.Sprintf("%s.log", name),
 		MaxSize:    maxSize,
-		MaxAge:     100,
-		MaxBackups: 100,
+		MaxAge:     7,
+		MaxBackups: 7,
 		LocalTime:  true,
 		Compress:   false,
 	}
@@ -46,8 +46,8 @@ func NewDefaultHook(name string, maxSize int) *DefaultHook {
 	errWriter := &lumberjack.Logger{
 		Filename:   fmt.Sprintf("%s_err.log", name),
 		MaxSize:    maxSize,
-		MaxAge:     100,
-		MaxBackups: 100,
+		MaxAge:     7,
+		MaxBackups: 7,
 		LocalTime:  true,
 		Compress:   false,
 	}
