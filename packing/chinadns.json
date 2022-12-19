@@ -1,23 +1,20 @@
 {
-   "listen": "0.0.0.0:65353",
+   "listen": "0.0.0.0:53",
    "udp-max-bytes": 4096,
-   "timeout": 2,
-   "cache_expire_sec": 60,
-   "domain2ip": {
-      "a.b": "127.0.0.1;2404:6800:4005:80c::200e"
-   },
-   "gfw_path": ["gfwlist.txt","gfwuser.txt"],
+   "timeout": 5,
+   "cache_expire_sec": 600,
+   "domain2ip":{},
    "dns-china": [
       "114.114.114.114"
    ],
    "dns-abroad": [
-      "doh@https://9.9.9.9/dns-query"
+	  "8.8.8.8"
    ],
    "chn_ip": [
       "chnroute.txt",
-      "chnroute-v6.txt"
+      "chnroute6.txt"
    ],
-   "chn_domain": "chinalist.txt",
-   "gfw_domain": "gfwlist.txt",
-   "log_level": "debug"
+   "chn_domain": ["chnlist.txt"],
+   "gfw_domain": ["gfwlist.txt"],
+   "log_level": "error"
 }
