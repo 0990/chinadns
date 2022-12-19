@@ -107,12 +107,6 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 			logger.WithError(err).Error("query error")
 			return
 		}
-
-		//logger.WithFields(logrus.Fields{
-		//	"RTT":      timeSinceMS(start),
-		//	"resolver": lookupRet.resolver,
-		//	"reply":    replyString(lookupRet.reply),
-		//}).Debug("Query result")
 		return
 	}
 
@@ -124,11 +118,6 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 			return
 		}
 
-		//logger.WithFields(logrus.Fields{
-		//	"RTT":      timeSinceMS(start),
-		//	"resolver": lookupRet.resolver,
-		//	"reply":    replyString(lookupRet.reply),
-		//}).Debug("Query result")
 		return
 	}
 
@@ -148,12 +137,6 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 
-	//logger.WithFields(logrus.Fields{
-	//	"RTT":      timeSinceMS(start),
-	//	"resolver": lookupRet.resolver,
-	//	"reply":    replyString(lookupRet.reply),
-	//}).Debug("Query result")
-
 	//使用国内dns但返回的是国外ip,则用国外dns的查询结果
 	if !s.isReplyIPChn(lookupRet.reply) {
 		logrus.WithField("domain", reqDomain).Warn("use china dns,but reply is abroad")
@@ -171,17 +154,9 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	}
 }
 
-func isIPV4(ip string) bool {
-	return net.ParseIP(ip).To4() != nil
-}
-
-func isIPV6(ip string) bool {
-	return net.ParseIP(ip).To16() != nil
-}
-
 func getIPV4(vs []string) (ret []string) {
 	for _, v := range vs {
-		if isIPV4(v) {
+		if getIPType(v) == IPV4 {
 			ret = append(ret, v)
 		}
 	}
@@ -190,7 +165,7 @@ func getIPV4(vs []string) (ret []string) {
 
 func getIPV6(vs []string) (ret []string) {
 	for _, v := range vs {
-		if isIPV6(v) {
+		if getIPType(v) == IPV6 {
 			ret = append(ret, v)
 		}
 	}
@@ -344,7 +319,6 @@ func answerCDNameString(reply *dns.Msg) string {
 }
 
 func replyString(reply *dns.Msg) string {
-	//return reply.String()
 	return answerIPString(reply) + answerCDNameString(reply)
 }
 
