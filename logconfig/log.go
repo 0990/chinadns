@@ -22,9 +22,8 @@ func InitLogrus(name string, maxMB int, level logrus.Level) {
 }
 
 type DefaultHook struct {
-	writer    io.Writer
-	errWriter io.Writer
-	fmt       logrus.Formatter
+	writer io.Writer
+	fmt    logrus.Formatter
 }
 
 func NewDefaultHook(name string, maxSize int) *DefaultHook {
@@ -43,19 +42,9 @@ func NewDefaultHook(name string, maxSize int) *DefaultHook {
 		Compress:   false,
 	}
 
-	errWriter := &lumberjack.Logger{
-		Filename:   fmt.Sprintf("%s_err.log", name),
-		MaxSize:    maxSize,
-		MaxAge:     7,
-		MaxBackups: 7,
-		LocalTime:  true,
-		Compress:   false,
-	}
-
 	return &DefaultHook{
-		writer:    writer,
-		errWriter: errWriter,
-		fmt:       formatter,
+		writer: writer,
+		fmt:    formatter,
 	}
 }
 
@@ -64,11 +53,7 @@ func (p *DefaultHook) Fire(entry *logrus.Entry) error {
 	if err != nil {
 		return err
 	}
-	if entry.Level > logrus.ErrorLevel {
-		_, err = p.writer.Write(data)
-	} else {
-		_, err = p.errWriter.Write(data)
-	}
+	_, err = p.writer.Write(data)
 	return err
 }
 

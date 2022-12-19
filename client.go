@@ -1,6 +1,7 @@
 package chinadns
 
 import (
+	"context"
 	"github.com/0990/chinadns/doh"
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
@@ -37,11 +38,11 @@ func NewClient(opts ...ClientOption) *Client {
 	}
 }
 
-func (c *Client) lookup(reqID uint32, req *dns.Msg, server *Resolver) (reply *dns.Msg, rtt time.Duration, err error) {
+func (c *Client) lookup(ctx context.Context, req *dns.Msg, server *Resolver) (reply *dns.Msg, rtt time.Duration, err error) {
 	logger := logrus.WithFields(logrus.Fields{
 		"question": questionString(&req.Question[0]),
-		"resolver": server,
-		"id":       reqID,
+		"dns":      server,
+		"aid":      reqID(req),
 	})
 
 	var rtt0 time.Duration
@@ -49,8 +50,7 @@ func (c *Client) lookup(reqID uint32, req *dns.Msg, server *Resolver) (reply *dn
 	for _, protocol := range server.Protocols {
 		switch protocol {
 		case "udp":
-			//logger.Debug("Query upstream udp")
-			reply, rtt0, err = c.UDPCli.Exchange(req, server.GetAddr())
+			reply, rtt0, err = c.UDPCli.ExchangeContext(ctx, req, server.GetAddr())
 			rtt += rtt0
 			if err == nil {
 				return
@@ -60,15 +60,14 @@ func (c *Client) lookup(reqID uint32, req *dns.Msg, server *Resolver) (reply *dn
 				logger.Error("Truncated msg received.Conder enlarge your UDP max size")
 			}
 		case "tcp":
-			//logger.Debug("Query upstream tcp")
-			reply, rtt0, err = c.TCPCli.Exchange(req, server.GetAddr())
+			reply, rtt0, err = c.TCPCli.ExchangeContext(ctx, req, server.GetAddr())
 			if err == nil {
 				return
 			}
 			rtt += rtt0
 			logger.WithError(err).Error("Fail to send TCP query.")
 		case "doh":
-			//logger.Debug("Query upstream doh")
+			//TODO context支持
 			reply, rtt, err = c.DoHCli.Exchange(req, server.GetAddr())
 			if err == nil {
 				return
