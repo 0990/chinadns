@@ -10,29 +10,29 @@
 ## 配置
 ```
 {
-  "listen": "0.0.0.0:53",
-  "udp-max-bytes": 4096,
-  "timeout": 5,
-  "cache_expire_sec": -1,
-  "domain2ip":{
-    "a.b":"192.168.1.5",
-    "a.c": "::"
-  },
-  "dns-china": [
-    "114.114.114.114",
-  ],
-  "dns-abroad": [
-    "8.8.8.8"
-  ],
-  "chn_ip": [
-    "chnroute.txt",
-    "chnroute-v6.txt"
-  ],
-  "chn_domain": "chinalist.txt",
-  "gfw_domain": "gfwlist.txt",
-  "log_level": "error"
+	"listen": "0.0.0.0:53",
+	"udp-max-bytes": 4096,
+	"timeout": 5,
+	"cache_expire_sec": 600,
+	"domain2ip": {},
+	"dns-china": [
+		"114.114.114.114"
+	],
+	"dns-abroad": [
+		"8.8.8.8"
+	],
+	"chn_ip": [
+		"chnroute.txt",
+		"chnroute6.txt"
+	],
+	"chn_domain": [
+		"chinalist.txt"
+	],
+	"gfw_domain": [
+		"gfwlist.txt"
+	],
+	"log_level": "error"
 }
-
 ```
 
 ## 原理
