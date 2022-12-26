@@ -256,14 +256,12 @@ func (s *Server) newID() uint32 {
 
 func (s *Server) isReplyIPChn(reply *dns.Msg) bool {
 	for _, ip := range replyIP(reply) {
-		ok, err := s.ChinaCIDR.Contains(ip)
+		contain, err := s.ChinaCIDR.Contains(ip)
 		if err != nil {
 			logrus.WithError(err).WithField("ip", ip.String()).Error("ChinaCIDR.Contains")
 			return false
 		}
-		if ok {
-			return true
-		}
+		return contain
 	}
 	return true
 }
