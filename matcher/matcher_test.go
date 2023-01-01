@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestMatcher(t *testing.T) {
+func Test_Matcher(t *testing.T) {
 	m, err := New("normal", "gfwlist.txt")
 	if err != nil {
 		t.Fatal(err)
@@ -69,4 +69,26 @@ func BenchmarkDomainMatcher_IsMatch(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		m.IsMatch("baidu.com")
 	}
+}
+
+func TestDomainTrie_Contain(t *testing.T) {
+	tr := &domainTrie{}
+
+	tr.Add("www.google.com")
+	tr.Add(".google.com")
+
+	contain := tr.Contain("cn.google.com")
+
+	if contain == false {
+		t.Fail()
+	}
+}
+
+func Test_Matcher_Compare(t *testing.T) {
+	m, err := New("test", "chnlist.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m.IsMatch("access.open.uc.cn")
 }

@@ -160,7 +160,7 @@ func WithChnDomain(paths []string) ServerOption {
 			return fmt.Errorf("empty for Gfw domain list")
 		}
 
-		m, err := matcher.New("test", paths...)
+		m, err := matcher.New("debug", paths...)
 		if err != nil {
 			return err
 		}
@@ -175,7 +175,7 @@ func WithGfwDomain(paths []string) ServerOption {
 			return fmt.Errorf("empty for Gfw domain list")
 		}
 
-		m, err := matcher.New("test", paths...)
+		m, err := matcher.New("debug", paths...)
 		if err != nil {
 			return err
 		}
