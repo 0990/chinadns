@@ -131,22 +131,34 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		lookupRetAbroad <- ret
 	}()
 
-	lookupRet, err = lookupInServers(req, s.DNSChinaServers, time.Second*1, s.lookup)
+	lookupRet, err = lookupInServers(req, s.DNSChinaServers, time.Millisecond*200, s.lookup)
 	if err != nil {
 		logger.WithError(err).Error("query error")
-		return
+	}
+
+	var useAbroadReason string
+	if err != nil {
+		useAbroadReason = "lookup china dns error"
+	} else if replyRet := replyString(lookupRet.reply); replyRet == "" {
+		useAbroadReason = "lookup china dns ok,but reply is empty"
+	} else if !s.isReplyIPChn(lookupRet.reply) {
+		useAbroadReason = "lookup china dns ok,but reply is abroad"
 	}
 
 	//使用国内dns但返回的是国外ip,则用国外dns的查询结果
-	if !s.isReplyIPChn(lookupRet.reply) {
-		logrus.WithField("domain", reqDomain).Warn("use china dns,but reply is abroad")
+	if useAbroadReason != "" {
+		logrus.WithFields(logrus.Fields{
+			"domain": reqDomain,
+			"reason": useAbroadReason,
+		}).Warn("Try use abroad dns")
+
 		select {
 		case lookupRet = <-lookupRetAbroad:
 			logger.WithFields(logrus.Fields{
 				"rtt":   timeSinceMS(start),
 				"dns":   lookupRet.resolver,
 				"reply": replyString(lookupRet.reply),
-			}).Debug("Query result")
+			}).Debug("Use aboard dns")
 			return
 		case <-time.After(time.Second * 3):
 			return
@@ -317,6 +329,9 @@ func answerCDNameString(reply *dns.Msg) string {
 }
 
 func replyString(reply *dns.Msg) string {
+	if reply == nil {
+		return ""
+	}
 	return answerIPString(reply) + answerCDNameString(reply)
 }
 
@@ -337,6 +352,7 @@ func lookupInServers(req *dns.Msg, servers []*Resolver, waitInterval time.Durati
 	defer cancel()
 
 	var wg sync.WaitGroup
+	var errs MultiError
 	doLookup := func(server *Resolver) {
 		defer wg.Done()
 
@@ -345,10 +361,11 @@ func lookupInServers(req *dns.Msg, servers []*Resolver, waitInterval time.Durati
 		start := time.Now()
 		reply, rtt, err := lookup(ctx, reqCopy, server)
 		if err != nil {
-			logger.WithFields(logrus.Fields{
-				"dns": server,
-				"rtt": int64(rtt / time.Millisecond),
-			}).WithError(err).Error("Query error")
+			errs.Add(fmt.Errorf("dns:%s,rtt:%v,err:%w", server, int64(rtt/time.Millisecond), err))
+			//logger.WithFields(logrus.Fields{
+			//	"dns": server,
+			//	"rtt": int64(rtt / time.Millisecond),
+			//}).WithError(err).Error("Query error")
 			return
 		}
 
@@ -384,7 +401,7 @@ func lookupInServers(req *dns.Msg, servers []*Resolver, waitInterval time.Durati
 		cancel()
 		return ret, nil
 	case <-done:
-		return nil, errors.New("all lookup error")
+		return nil, &errs
 	}
 }
 

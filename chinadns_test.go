@@ -2,6 +2,7 @@ package chinadns
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"testing"
 )
@@ -22,4 +23,13 @@ func Test_CreateConfig(t *testing.T) {
 
 	c, _ := json.MarshalIndent(cfg, "", "   ")
 	ioutil.WriteFile("chinadns.json", c, 0644)
+}
+
+func Test_MultiError(t *testing.T) {
+	errs := &MultiError{}
+	errs.Add(errors.New("hello"))
+	errs.Add(errors.New("world"))
+	if errs.Error() != "hello;world" {
+		t.Failed()
+	}
 }
