@@ -10,6 +10,7 @@
    "dns-abroad": [
 	  "8.8.8.8"
    ],
+   "dns-abroad-proxy": "",
    "chn_ip": [
       "chnroute.txt",
       "chnroute6.txt"

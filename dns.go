@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-type LookupFunc func(ctx context.Context, request *dns.Msg, server *Resolver) (reply *dns.Msg, rtt time.Duration, err error)
+type LookupFunc func(ctx context.Context, request *dns.Msg, server *Resolver) (reply *dns.Msg, remark string, err error)
 
 type LookupResult struct {
 	reply    *dns.Msg
@@ -112,7 +112,7 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 	//gfw block的域名直接使用国外dns
 	if s.gfwDomainMatcher.IsMatch(reqDomain) {
-		lookupRet, err = lookupInServers(req, s.DNSAbroadServers, time.Second*2, s.lookup)
+		lookupRet, err = lookupInServers(req, s.DNSAbroadServers, time.Second*2, s.lookupProxyPriority)
 		if err != nil {
 			logger.WithError(err).Error("query error")
 			return
@@ -123,7 +123,7 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 	lookupRetAbroad := make(chan *LookupResult, 1)
 	go func() {
-		ret, err := lookupInServers(req, s.DNSAbroadServers, time.Second*2, s.lookup)
+		ret, err := lookupInServers(req, s.DNSAbroadServers, time.Second*2, s.lookupProxyPriority)
 		if err != nil {
 			logger.WithError(err).Error("query error")
 			return
@@ -359,21 +359,24 @@ func lookupInServers(req *dns.Msg, servers []*Resolver, waitInterval time.Durati
 		reqCopy := req.Copy()
 
 		start := time.Now()
-		reply, rtt, err := lookup(ctx, reqCopy, server)
+		reply, remark, err := lookup(ctx, reqCopy, server)
+		rtt := timeSinceMS(start)
 		if err != nil {
-			errs.Add(fmt.Errorf("dns:%s,rtt:%v,err:%w", server, int64(rtt/time.Millisecond), err))
-			//logger.WithFields(logrus.Fields{
-			//	"dns": server,
-			//	"rtt": int64(rtt / time.Millisecond),
-			//}).WithError(err).Error("Query error")
+			errs.Add(fmt.Errorf("dns:%s,rtt:%v,err:%w", server, rtt, err))
 			return
 		}
 
-		logger.WithFields(logrus.Fields{
-			"rtt":   timeSinceMS(start),
+		log := logger.WithFields(logrus.Fields{
+			"rtt":   rtt,
 			"dns":   server,
 			"reply": replyString(reply),
-		}).Debug("Query result")
+		})
+
+		if remark != "" {
+			log = log.WithField("remark", remark)
+		}
+
+		log.Debug("Query result")
 
 		select {
 		case result <- &LookupResult{

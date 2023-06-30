@@ -1,9 +1,12 @@
 package doh
 
 import (
+	"context"
 	"encoding/base64"
 	"errors"
+	"github.com/0990/socks5"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"time"
@@ -19,6 +22,7 @@ var ErrQueryMyself = errors.New("not allowed to query myself")
 type clientOptions struct {
 	Timeout         time.Duration
 	SkipQueryMyself bool
+	Socks5Proxy     string
 }
 
 type ClientOption func(*clientOptions)
@@ -27,6 +31,12 @@ type ClientOption func(*clientOptions)
 func WithTimeout(t time.Duration) ClientOption {
 	return func(o *clientOptions) {
 		o.Timeout = t
+	}
+}
+
+func WithSocks5Proxy(proxy string) ClientOption {
+	return func(o *clientOptions) {
+		o.Socks5Proxy = proxy
 	}
 }
 
@@ -50,15 +60,36 @@ func NewClient(opts ...ClientOption) *Client {
 	for _, f := range opts {
 		f(o)
 	}
+
+	cli := &http.Client{
+		Timeout: o.Timeout,
+	}
+	if o.Socks5Proxy != "" {
+		sc := socks5.NewSocks5Client(socks5.ClientCfg{
+			ServerAddr: o.Socks5Proxy,
+			UserName:   "",
+			Password:   "",
+			UDPTimout:  60,
+			TCPTimeout: 60,
+		})
+
+		cli = &http.Client{
+			Timeout: o.Timeout,
+			Transport: &http.Transport{
+				DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+					return sc.Dial(network, addr)
+				},
+			},
+		}
+	}
+
 	return &Client{
 		opt: o,
-		cli: &http.Client{
-			Timeout: o.Timeout,
-		},
+		cli: cli,
 	}
 }
 
-func (c *Client) Exchange(req *dns.Msg, address string) (r *dns.Msg, rtt time.Duration, err error) {
+func (c *Client) Exchange(ctx context.Context, req *dns.Msg, address string) (r *dns.Msg, rtt time.Duration, err error) {
 	var (
 		buf, b64 []byte
 		begin    = time.Now()
@@ -87,7 +118,10 @@ func (c *Client) Exchange(req *dns.Msg, address string) (r *dns.Msg, rtt time.Du
 	// No need to use hreq.URL.Query()
 	uri := address + "?dns=" + string(b64)
 	logrus.Debugln("DoH request:", uri)
-	hreq, _ := http.NewRequest("GET", uri, nil)
+	hreq, err := http.NewRequestWithContext(ctx, "GET", uri, nil)
+	if err != nil {
+		return nil, 0, err
+	}
 	hreq.Header.Add("Accept", DoHMediaType)
 	resp, err := c.cli.Do(hreq)
 	if err != nil {

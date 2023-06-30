@@ -75,6 +75,7 @@ func main() {
 	copts := []chinadns.ClientOption{
 		chinadns.WithUDPMaxBytes(cfg.UDPMaxBytes),
 		chinadns.WithTimeout(time.Duration(cfg.Timeout) * time.Second),
+		chinadns.WithDNSAboardProxy(cfg.DNSAbroadProxy),
 	}
 
 	sopts := []chinadns.ServerOption{
@@ -88,7 +89,10 @@ func main() {
 		chinadns.WithGfwDomain(cfg.GfwDomain),
 	}
 
-	client := chinadns.NewClient(copts...)
+	client, err := chinadns.NewClient(copts...)
+	if err != nil {
+		panic(err)
+	}
 	server, err := chinadns.NewServer(client, sopts...)
 	if err != nil {
 		panic(err)
