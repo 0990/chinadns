@@ -1,14 +1,21 @@
 package chinadns
 
+import "sync"
+
 type MultiError struct {
 	errs []error
+	sync.Mutex
 }
 
 func (m *MultiError) Add(err error) {
+	m.Lock()
+	defer m.Unlock()
 	m.errs = append(m.errs, err)
 }
 
 func (m *MultiError) Error() string {
+	m.Lock()
+	defer m.Unlock()
 	if len(m.errs) == 0 {
 		return ""
 	}
