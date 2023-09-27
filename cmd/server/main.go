@@ -81,7 +81,7 @@ func main() {
 	sopts := []chinadns.ServerOption{
 		chinadns.WithListenAddr(cfg.Listen),
 		chinadns.WithCacheExpireSec(cfg.CacheExpireSec),
-		chinadns.WithDNS(cfg.DNSChina, cfg.DNSAbroad),
+		chinadns.WithDNS(cfg.DNSChina, cfg.DNSAbroad, cfg.DNSAdBlock),
 		chinadns.WithDomain2IP(cfg.Domain2IP),
 		chinadns.WithDNSAboardAttr(cfg.DNSAbroadAttr),
 		chinadns.WithCHNFile(cfg.ChnIP),

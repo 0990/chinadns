@@ -33,7 +33,6 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 	start := time.Now()
 
-	var err error
 	var lookupRet *LookupResult
 
 	var hitCache bool
@@ -100,25 +99,55 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 	//s.normalizeRequest(req)
 
-	//国内域名直接走国内dns
-	if s.chnDomainMatcher.IsMatch(reqDomain) {
-		lookupRet, err = lookupInServers(req, s.DNSChinaServers, time.Second*2, s.lookup)
+	lookupRetChnGfw := make(chan *LookupResult)
+	go func() {
+		ret, err := s.lookupChnGfw(reqDomain, req, logger, start)
 		if err != nil {
+			lookupRetChnGfw <- nil
 			logger.WithError(err).Error("query error")
 			return
 		}
+		lookupRetChnGfw <- ret
+	}()
+
+	adBlockResult, err := s.lookupAdBlock(req)
+	if err == nil && adBlockResult != nil && isAdBlockReply(adBlockResult.reply) {
+		lookupRet = adBlockResult
 		return
+	}
+
+	lookupRet = <-lookupRetChnGfw
+}
+
+func isAdBlockReply(reply *dns.Msg) bool {
+	if reply == nil {
+		return false
+	}
+
+	if len(reply.Answer) != 1 {
+		return false
+	}
+
+	answer := reply.Answer[0]
+	switch answer.Header().Rrtype {
+	case dns.TypeA:
+		return answer.(*dns.A).A.String() == "0.0.0.0"
+	case dns.TypeAAAA:
+		return answer.(*dns.AAAA).AAAA.String() == "::"
+	default:
+		return false
+	}
+}
+
+func (s *Server) lookupChnGfw(reqDomain string, req *dns.Msg, logger *logrus.Entry, start time.Time) (*LookupResult, error) {
+	//国内域名直接走国内dns
+	if s.chnDomainMatcher.IsMatch(reqDomain) {
+		return lookupInServers(req, s.DNSChinaServers, time.Second*2, s.lookup)
 	}
 
 	//gfw block的域名直接使用国外dns
 	if s.gfwDomainMatcher.IsMatch(reqDomain) {
-		lookupRet, err = lookupInServers(req, s.DNSAbroadServers, time.Second*2, s.lookupProxyPriority)
-		if err != nil {
-			logger.WithError(err).Error("query error")
-			return
-		}
-
-		return
+		return lookupInServers(req, s.DNSAbroadServers, time.Second*2, s.lookupProxyPriority)
 	}
 
 	lookupRetAbroad := make(chan *LookupResult, 1)
@@ -131,7 +160,7 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		lookupRetAbroad <- ret
 	}()
 
-	lookupRet, err = lookupInServers(req, s.DNSChinaServers, time.Millisecond*200, s.lookup)
+	lookupRet, err := lookupInServers(req, s.DNSChinaServers, time.Millisecond*200, s.lookup)
 	if err != nil {
 		logger.WithError(err).Error("query error")
 	}
@@ -145,25 +174,31 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		useAbroadReason = "lookup china dns ok,but reply is abroad"
 	}
 
-	//使用国内dns但返回的是国外ip,则用国外dns的查询结果
-	if useAbroadReason != "" {
-		logrus.WithFields(logrus.Fields{
-			"domain": reqDomain,
-			"reason": useAbroadReason,
-		}).Warn("Try use abroad dns")
-
-		select {
-		case lookupRet = <-lookupRetAbroad:
-			logger.WithFields(logrus.Fields{
-				"rtt":   timeSinceMS(start),
-				"dns":   lookupRet.resolver,
-				"reply": replyString(lookupRet.reply),
-			}).Debug("Use aboard dns")
-			return
-		case <-time.After(time.Second * 3):
-			return
-		}
+	if useAbroadReason == "" {
+		return lookupRet, err
 	}
+
+	//使用国内dns但返回的是国外ip,则用国外dns的查询结果
+	logrus.WithFields(logrus.Fields{
+		"domain": reqDomain,
+		"reason": useAbroadReason,
+	}).Warn("Try use abroad dns")
+
+	select {
+	case lookupRet = <-lookupRetAbroad:
+		logger.WithFields(logrus.Fields{
+			"rtt":   timeSinceMS(start),
+			"dns":   lookupRet.resolver,
+			"reply": replyString(lookupRet.reply),
+		}).Debug("Use aboard dns")
+		return lookupRet, nil
+	case <-time.After(time.Second * 3):
+		return nil, errors.New("lookup abroad dns timeout")
+	}
+}
+
+func (s *Server) lookupAdBlock(req *dns.Msg) (*LookupResult, error) {
+	return lookupInServers(req, s.DNSAdBlockServers, time.Second*2, s.lookup)
 }
 
 func getIPV4(vs []string) (ret []string) {

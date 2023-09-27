@@ -21,8 +21,9 @@ type serverOptions struct {
 
 	Domain2IP sync.Map
 
-	DNSChinaServers  resolverList // DNS servers which can be trusted
-	DNSAbroadServers resolverList // DNS servers which may return polluted results
+	DNSChinaServers   resolverList // DNS servers which can be trusted
+	DNSAbroadServers  resolverList // DNS servers which may return polluted results
+	DNSAdBlockServers resolverList // DNS servers which block ads
 
 	DNSAbroadAttr []DomainAttr
 
@@ -75,7 +76,7 @@ func WithDNSAboardAttr(attr string) ServerOption {
 	}
 }
 
-func WithDNS(dnsChina, dnsAbroad []string) ServerOption {
+func WithDNS(dnsChina, dnsAbroad []string, dnsAdBlock []string) ServerOption {
 	return func(o *serverOptions) error {
 		for _, schema := range dnsChina {
 			newResolver, err := ParseResolver(schema, false)
@@ -93,20 +94,17 @@ func WithDNS(dnsChina, dnsAbroad []string) ServerOption {
 			o.DNSAbroadServers = uniqueAppendResolver(o.DNSAbroadServers, newResolver)
 		}
 
+		for _, schema := range dnsAdBlock {
+			newResolver, err := ParseResolver(schema, false)
+			if err != nil {
+				return err
+			}
+			o.DNSAdBlockServers = uniqueAppendResolver(o.DNSAdBlockServers, newResolver)
+		}
+
 		return nil
 	}
 }
-
-//func WithGFWFile(addr []string) ServerOption {
-//	return func(o *serverOptions) error {
-//		gfw, err := gfwlist.NewFromFiles(addr, false)
-//		if err != nil {
-//			return err
-//		}
-//		o.gfwlist = gfw
-//		return nil
-//	}
-//}
 
 func WithCHNFile(paths []string) ServerOption {
 	return func(o *serverOptions) error {
