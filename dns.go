@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
-	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -42,12 +41,15 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	reqDomain := reqDomain(req)
 
 	defer func() {
-		if !hitCache && lookupRet != nil {
-			replyRet := replyString(lookupRet.reply)
-			if replyRet != "" {
-				s.cache.Set(question, lookupRet)
-			}
+		if !hitCache {
+			s.setCached(question, lookupRet)
 		}
+		//if !hitCache && lookupRet != nil {
+		//	replyRet := replyString(lookupRet.reply)
+		//	if replyRet != "" {
+		//		s.cache.Set(question, lookupRet)
+		//	}
+		//}
 
 		if lookupRet == nil {
 			logger.Warn("reply==nil")
@@ -56,6 +58,7 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 
 			lookupRet = &LookupResult{reply: reply}
 		}
+
 		var filter bool
 		if attrs := s.getResolverAttr(lookupRet.resolver); len(attrs) > 0 {
 			filter = filterLookupRetByAttrs(lookupRet, attrs)
@@ -88,11 +91,12 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	if v, ok := s.cache.Get(question); ok {
 		hitCache = true
 
-		reply := v.reply.Copy()
+		r := v.(*LookupResult)
+		reply := r.reply.Copy()
 		reply.Id = req.Id
 		lookupRet = &LookupResult{
 			reply:    reply,
-			resolver: v.resolver,
+			resolver: r.resolver,
 		}
 		return
 	}
@@ -111,32 +115,12 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	}()
 
 	adBlockResult, err := s.lookupAdBlock(req)
-	if err == nil && adBlockResult != nil && isAdBlockReply(adBlockResult.reply) {
+	if err == nil && adBlockResult != nil && s.DNSAdBlockJudge.IsAdBlockReply(adBlockResult.reply) {
 		lookupRet = adBlockResult
 		return
 	}
 
 	lookupRet = <-lookupRetChnGfw
-}
-
-func isAdBlockReply(reply *dns.Msg) bool {
-	if reply == nil {
-		return false
-	}
-
-	if len(reply.Answer) != 1 {
-		return false
-	}
-
-	answer := reply.Answer[0]
-	switch answer.Header().Rrtype {
-	case dns.TypeA:
-		return answer.(*dns.A).A.String() == "0.0.0.0"
-	case dns.TypeAAAA:
-		return answer.(*dns.AAAA).AAAA.String() == "::"
-	default:
-		return false
-	}
 }
 
 func (s *Server) lookupChnGfw(reqDomain string, req *dns.Msg, logger *logrus.Entry, start time.Time) (*LookupResult, error) {
@@ -199,24 +183,6 @@ func (s *Server) lookupChnGfw(reqDomain string, req *dns.Msg, logger *logrus.Ent
 
 func (s *Server) lookupAdBlock(req *dns.Msg) (*LookupResult, error) {
 	return lookupInServers(req, s.DNSAdBlockServers, time.Second*2, s.lookup)
-}
-
-func getIPV4(vs []string) (ret []string) {
-	for _, v := range vs {
-		if getIPType(v) == IPV4 {
-			ret = append(ret, v)
-		}
-	}
-	return
-}
-
-func getIPV6(vs []string) (ret []string) {
-	for _, v := range vs {
-		if getIPType(v) == IPV6 {
-			ret = append(ret, v)
-		}
-	}
-	return
 }
 
 // 查找自定义域名
@@ -311,63 +277,6 @@ func (s *Server) isReplyIPChn(reply *dns.Msg) bool {
 		return contain
 	}
 	return true
-}
-
-func replyIP(reply *dns.Msg) []net.IP {
-	var ip []net.IP
-	for _, rr := range reply.Answer {
-		switch answer := rr.(type) {
-		case *dns.A:
-			ip = append(ip, answer.A)
-		case *dns.AAAA:
-			ip = append(ip, answer.AAAA)
-		case *dns.CNAME:
-			continue
-		default:
-			continue
-		}
-	}
-	return ip
-}
-
-func replyCDName(reply *dns.Msg) (ret []string) {
-	for _, rr := range reply.Answer {
-		switch answer := rr.(type) {
-		case *dns.A:
-			continue
-		case *dns.AAAA:
-			continue
-		case *dns.CNAME:
-			ret = append(ret, answer.Target)
-		case *dns.DNAME:
-			ret = append(ret, answer.Target)
-		default:
-			continue
-		}
-	}
-	return ret
-}
-
-func answerIPString(reply *dns.Msg) string {
-	ips := replyIP(reply)
-	var ip string
-	for _, v := range ips {
-		ip += v.String()
-		ip += ";"
-	}
-	return ip
-}
-
-func answerCDNameString(reply *dns.Msg) string {
-	ips := replyCDName(reply)
-	return strings.Join(ips, ";")
-}
-
-func replyString(reply *dns.Msg) string {
-	if reply == nil {
-		return ""
-	}
-	return answerIPString(reply) + answerCDNameString(reply)
 }
 
 func lookupInServers(req *dns.Msg, servers []*Resolver, waitInterval time.Duration, lookup LookupFunc) (*LookupResult, error) {

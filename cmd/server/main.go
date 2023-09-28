@@ -5,7 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/0990/chinadns"
-	"github.com/0990/chinadns/logconfig"
+	"github.com/0990/chinadns/pkg/logconfig"
 	"github.com/sirupsen/logrus"
 	"net/http"
 	_ "net/http/pprof"
@@ -84,6 +84,7 @@ func main() {
 		chinadns.WithDNS(cfg.DNSChina, cfg.DNSAbroad, cfg.DNSAdBlock),
 		chinadns.WithDomain2IP(cfg.Domain2IP),
 		chinadns.WithDNSAboardAttr(cfg.DNSAbroadAttr),
+		chinadns.WithAdBlockReply(cfg.DNSAdBlockReply),
 		chinadns.WithCHNFile(cfg.ChnIP),
 		chinadns.WithChnDomain(cfg.ChnDomain),
 		chinadns.WithGfwDomain(cfg.GfwDomain),

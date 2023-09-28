@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/0990/chinadns/doh"
+	"github.com/0990/chinadns/pkg/doh"
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
 	"strings"

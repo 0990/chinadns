@@ -2,6 +2,7 @@ package chinadns
 
 import (
 	"context"
+	cache2 "github.com/0990/chinadns/pkg/cache"
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -15,7 +16,7 @@ type Server struct {
 
 	requestID uint32
 
-	cache DNSCache
+	cache cache2.DNSCache
 }
 
 func NewServer(cli *Client, opts ...ServerOption) (*Server, error) {
@@ -33,7 +34,7 @@ func NewServer(cli *Client, opts ...ServerOption) (*Server, error) {
 		Client:        cli,
 		UDPServer:     &dns.Server{Addr: o.Listen, Net: "udp", ReusePort: true},
 		TCPServer:     &dns.Server{Addr: o.Listen, Net: "tcp", ReusePort: true},
-		cache:         newDNSCache(o.CacheExpireSec),
+		cache:         cache2.NewDNSCache(o.CacheExpireSec),
 	}
 
 	s.UDPServer.Handler = dns.HandlerFunc(s.Serve)

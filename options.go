@@ -3,7 +3,7 @@ package chinadns
 import (
 	"bufio"
 	"fmt"
-	"github.com/0990/chinadns/matcher"
+	"github.com/0990/chinadns/pkg/matcher"
 	"github.com/yl2chen/cidranger"
 	"net"
 	"os"
@@ -25,7 +25,8 @@ type serverOptions struct {
 	DNSAbroadServers  resolverList // DNS servers which may return polluted results
 	DNSAdBlockServers resolverList // DNS servers which block ads
 
-	DNSAbroadAttr []DomainAttr
+	DNSAbroadAttr   []DomainAttr
+	DNSAdBlockJudge *AdBlockJudge
 
 	ChinaCIDR cidranger.Ranger
 
@@ -35,7 +36,8 @@ type serverOptions struct {
 
 func newServerOptions() *serverOptions {
 	return &serverOptions{
-		Listen: "[::]:53",
+		Listen:          "[::]:53",
+		DNSAdBlockJudge: NewAdBlockJudge(nil),
 	}
 }
 
@@ -102,6 +104,13 @@ func WithDNS(dnsChina, dnsAbroad []string, dnsAdBlock []string) ServerOption {
 			o.DNSAdBlockServers = uniqueAppendResolver(o.DNSAdBlockServers, newResolver)
 		}
 
+		return nil
+	}
+}
+
+func WithAdBlockReply(adBlockReply []string) ServerOption {
+	return func(o *serverOptions) error {
+		o.DNSAdBlockJudge = NewAdBlockJudge(adBlockReply)
 		return nil
 	}
 }

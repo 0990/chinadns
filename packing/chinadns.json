@@ -11,6 +11,8 @@
 	  "8.8.8.8"
    ],
    "dns-abroad-proxy": "",
+   "dns-adblock": [],
+   "dns-adblock-reply": [],
    "chn_ip": [
       "chnroute.txt",
       "chnroute6.txt"
