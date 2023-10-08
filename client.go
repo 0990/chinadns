@@ -81,7 +81,7 @@ func (c *Client) lookup(ctx context.Context, req *dns.Msg, server *Resolver) (re
 	logger := logrus.WithFields(logrus.Fields{
 		"question": questionString(&req.Question[0]),
 		"dns":      server,
-		"aid":      reqID(req),
+		"id":       reqID(req),
 	})
 
 	for _, protocol := range server.Protocols {
@@ -119,7 +119,7 @@ func (c *Client) lookupByProxy(ctx context.Context, req *dns.Msg, server *Resolv
 	logger := logrus.WithFields(logrus.Fields{
 		"question": questionString(&req.Question[0]),
 		"dns":      server,
-		"aid":      reqID(req),
+		"id":       reqID(req),
 	})
 
 	remark = fmt.Sprintf("useproxy:%s://%s", c.proxyProto, c.proxyAddr)

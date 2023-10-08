@@ -26,8 +26,8 @@ func reqID(req *dns.Msg) string {
 
 func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	logger := logrus.WithFields(logrus.Fields{
-		"aq":  questionString(&req.Question[0]),
-		"aid": reqID(req),
+		"q":  questionString(&req.Question[0]),
+		"id": reqID(req),
 	})
 
 	start := time.Now()
@@ -44,12 +44,6 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		if !hitCache {
 			s.setCached(question, lookupRet)
 		}
-		//if !hitCache && lookupRet != nil {
-		//	replyRet := replyString(lookupRet.reply)
-		//	if replyRet != "" {
-		//		s.cache.Set(question, lookupRet)
-		//	}
-		//}
 
 		if lookupRet == nil {
 			logger.Warn("reply==nil")
@@ -101,6 +95,10 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 
+	//ip反向查找域名类型查询，暂不支持
+	if req.Question[0].Qtype == dns.TypePTR {
+		return
+	}
 	//s.normalizeRequest(req)
 
 	lookupRetChnGfw := make(chan *LookupResult)
@@ -118,6 +116,8 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 	if err == nil && adBlockResult != nil && s.DNSAdBlockJudge.IsAdBlockReply(adBlockResult.reply) {
 		lookupRet = adBlockResult
 		return
+	} else if err != nil {
+		logger.WithError(err).Error("query error")
 	}
 
 	lookupRet = <-lookupRetChnGfw
@@ -193,8 +193,8 @@ func (s *Server) lookUpInCustom(domain string, req *dns.Msg) (*dns.Msg, bool) {
 	}
 
 	logger := logrus.WithFields(logrus.Fields{
-		"aq":  questionString(&req.Question[0]),
-		"aid": reqID(req),
+		"q":  questionString(&req.Question[0]),
+		"id": reqID(req),
 	})
 
 	qType := req.Question[0].Qtype
@@ -285,8 +285,8 @@ func lookupInServers(req *dns.Msg, servers []*Resolver, waitInterval time.Durati
 	}
 
 	logger := logrus.WithFields(logrus.Fields{
-		"aid": reqID(req),
-		"aq":  questionString(&req.Question[0]),
+		"id": reqID(req),
+		"q":  questionString(&req.Question[0]),
 	})
 
 	result := make(chan *LookupResult, 1)
