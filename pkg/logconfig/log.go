@@ -9,33 +9,36 @@ import (
 	"sort"
 )
 
+var SortKeys = []string{logrus.FieldKeyTime, logrus.FieldKeyLevel, "id", logrus.FieldKeyMsg, "q", "rtt"}
+
+var SortingFunc = func(keys []string) {
+	sort.SliceStable(keys, func(i, j int) bool {
+		//按照sortKeys的顺序排序keys,sortKeys中索引越小的越靠前,如果不在sortKeys中，则比较字符串大小
+		iIndex := util.IndexOfString(SortKeys, keys[i])
+		jIndex := util.IndexOfString(SortKeys, keys[j])
+		if iIndex != -1 && jIndex != -1 {
+			return iIndex < jIndex
+		}
+
+		if iIndex != -1 {
+			return true
+		}
+
+		if jIndex != -1 {
+			return false
+		}
+
+		return keys[i] < keys[j] //按照字符串大小排序
+	})
+}
+
 func InitLogrus(name string, maxMB int, level logrus.Level) {
 
-	sortKeys := []string{logrus.FieldKeyTime, logrus.FieldKeyLevel, "id", logrus.FieldKeyMsg, "q", "rtt"}
 	formatter := &logrus.TextFormatter{
 		DisableColors:    true,
 		DisableTimestamp: false,
 		TimestampFormat:  "2006-01-02 15:04:05",
-		SortingFunc: func(keys []string) {
-			sort.SliceStable(keys, func(i, j int) bool {
-				//按照sortKeys的顺序排序keys,sortKeys中索引越小的越靠前,如果不在sortKeys中，则比较字符串大小
-				iIndex := util.IndexOfString(sortKeys, keys[i])
-				jIndex := util.IndexOfString(sortKeys, keys[j])
-				if iIndex != -1 && jIndex != -1 {
-					return iIndex < jIndex
-				}
-
-				if iIndex != -1 {
-					return true
-				}
-
-				if jIndex != -1 {
-					return false
-				}
-
-				return keys[i] < keys[j] //按照字符串大小排序
-			})
-		},
+		SortingFunc:      SortingFunc,
 	}
 
 	logrus.SetFormatter(formatter)
@@ -54,6 +57,7 @@ func NewDefaultHook(name string, maxSize int) *DefaultHook {
 		DisableColors:    true,
 		DisableTimestamp: false,
 		TimestampFormat:  "2006-01-02 15:04:05",
+		SortingFunc:      SortingFunc,
 	}
 
 	writer := &lumberjack.Logger{
