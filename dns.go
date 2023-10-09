@@ -180,7 +180,7 @@ func (s *Server) lookupChnGfw(reqDomain string, req *dns.Msg, logger *logrus.Ent
 }
 
 func (s *Server) lookupAdBlock(req *dns.Msg) (*LookupResult, error) {
-	return lookupInServers(req, s.DNSAdBlockServers, time.Second*2, s.lookup)
+	return lookupInServers(req, s.DNSAdBlockServers, time.Millisecond*50, s.lookup)
 }
 
 // 查找自定义域名
