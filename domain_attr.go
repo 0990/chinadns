@@ -1,6 +1,7 @@
 package chinadns
 
 import (
+	"github.com/0990/chinadns/pkg/util"
 	"github.com/miekg/dns"
 )
 
@@ -39,6 +40,11 @@ func filterLookupRetByAttrs(ret *LookupResult, attrs []DomainAttr) bool {
 		return false
 	}
 
+	if ret.reply.Question[0].Qtype == dns.TypeAAAA && util.IsInArray(DomainAttr_NO_IPV6, attrs) {
+		ret.reply = genEmptyNoError(ret.reply)
+		return true
+	}
+
 	var filter bool
 	for _, v := range attrs {
 		if filterLookupRetByAttr(ret, v) {
@@ -57,30 +63,49 @@ func filterLookupRetByAttr(ret *LookupResult, attr DomainAttr) bool {
 	if attr == DomainAttr_Invalid {
 		return false
 	}
-	var del bool
+
+	var filter bool
 	for i := 0; i < len(ret.reply.Answer); {
-		if domainAttr2RType(attr) == ret.reply.Answer[i].Header().Rrtype {
+		if isDel(ret.reply.Answer[i], attr) {
 			ret.reply.Answer = append(ret.reply.Answer[:i], ret.reply.Answer[i+1:]...)
-			del = true
+			filter = true
 		} else {
 			i++
 		}
 	}
-	return del
+
+	for _, v := range ret.reply.Answer {
+		if filterHTTPSNoipv6(v, attr) {
+			filter = true
+		}
+	}
+	return filter
 }
 
-func domainAttr2RType(attr DomainAttr) uint16 {
-	switch attr {
-	case DomainAttr_NO_CNAME:
-		return dns.TypeCNAME
-	case DomainAttr_NO_IPV4:
-		return dns.TypeA
-	case DomainAttr_NO_IPV6:
-		return dns.TypeAAAA
-	case DomainAttr_NO_HTTPS:
-		return dns.TypeHTTPS
+func isDel(rr dns.RR, attr DomainAttr) bool {
+	switch rr.(type) {
+	case *dns.CNAME:
+		return attr == DomainAttr_NO_CNAME
+	case *dns.A:
+		return attr == DomainAttr_NO_IPV4
+	case *dns.AAAA:
+		return attr == DomainAttr_NO_IPV6
+	case *dns.HTTPS:
+		return attr == DomainAttr_NO_HTTPS
 	default:
-		return dns.TypeNone
+		return false
+	}
+}
+
+func filterHTTPSNoipv6(rr dns.RR, attr DomainAttr) bool {
+	switch a := rr.(type) {
+	case *dns.HTTPS:
+		if attr == DomainAttr_NO_IPV6 {
+			return removeIPv6Hints(a)
+		}
+		return false
+	default:
+		return false
 	}
 }
 

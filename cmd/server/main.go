@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/0990/chinadns"
+	"github.com/0990/chinadns/internal/version"
 	"github.com/0990/chinadns/pkg/logconfig"
 	"github.com/sirupsen/logrus"
 	"net/http"
@@ -17,9 +18,19 @@ import (
 
 var confFile = flag.String("c", "chinadns.json", "config file")
 var workingDir = flag.String("w", "", "working dir")
+var versionFlag = flag.Bool("version", false, "Show version and then quit")
 
 func main() {
 	flag.Parse()
+
+	if *versionFlag {
+		fmt.Println(version.String())
+		fmt.Println(version.BuildString())
+		os.Exit(0)
+	}
+
+	fmt.Println("version:", version.String())
+	fmt.Println("build:", version.BuildString())
 
 	cfgFile := *confFile
 	if *workingDir != "" {

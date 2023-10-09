@@ -57,6 +57,7 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		if attrs := s.getResolverAttr(lookupRet.resolver); len(attrs) > 0 {
 			filter = filterLookupRetByAttrs(lookupRet, attrs)
 		}
+
 		// https://github.com/miekg/dns/issues/216
 		lookupRet.reply.Compress = true
 		_ = w.WriteMsg(lookupRet.reply)
@@ -66,10 +67,10 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		logger.WithFields(logrus.Fields{
 			"rtt":    timeSinceMS(start),
 			"dns":    lookupRet.resolver,
-			"reply":  replyRet,
+			"empty":  len(replyRet) == 0,
 			"filter": filter,
-			//"z":        lookupRet.reply.String(),
-			"cache": hitCache,
+			"result": "\n" + lookupRet.reply.String(),
+			"cache":  hitCache,
 		}).Debug("DNS reply")
 	}()
 
@@ -112,12 +113,14 @@ func (s *Server) Serve(w dns.ResponseWriter, req *dns.Msg) {
 		lookupRetChnGfw <- ret
 	}()
 
-	adBlockResult, err := s.lookupAdBlock(req)
-	if err == nil && adBlockResult != nil && s.DNSAdBlockJudge.IsAdBlockReply(adBlockResult.reply) {
-		lookupRet = adBlockResult
-		return
-	} else if err != nil {
-		logger.WithError(err).Error("query error")
+	if len(s.DNSAdBlockServers) > 0 {
+		adBlockResult, err := s.lookupAdBlock(req)
+		if err == nil && adBlockResult != nil && s.DNSAdBlockJudge.IsAdBlockReply(adBlockResult.reply) {
+			lookupRet = adBlockResult
+			return
+		} else if err != nil {
+			logger.WithError(err).Error("query error")
+		}
 	}
 
 	lookupRet = <-lookupRetChnGfw
@@ -170,11 +173,6 @@ func (s *Server) lookupChnGfw(reqDomain string, req *dns.Msg, logger *logrus.Ent
 
 	select {
 	case lookupRet = <-lookupRetAbroad:
-		logger.WithFields(logrus.Fields{
-			"rtt":   timeSinceMS(start),
-			"dns":   lookupRet.resolver,
-			"reply": replyString(lookupRet.reply),
-		}).Debug("Use aboard dns")
 		return lookupRet, nil
 	case <-time.After(time.Second * 3):
 		return nil, errors.New("lookup abroad dns timeout")
@@ -311,9 +309,10 @@ func lookupInServers(req *dns.Msg, servers []*Resolver, waitInterval time.Durati
 		}
 
 		log := logger.WithFields(logrus.Fields{
-			"rtt":   rtt,
-			"dns":   server,
-			"reply": replyString(reply),
+			"rtt":    rtt,
+			"dns":    server,
+			"empty":  len(replyString(reply)) == 0,
+			"result": "\n" + reply.String(),
 		})
 
 		if remark != "" {

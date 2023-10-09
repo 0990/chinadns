@@ -126,9 +126,70 @@ func answerCDNameString(reply *dns.Msg) string {
 	return strings.Join(ips, ";")
 }
 
+func replyHTTPS(reply *dns.Msg) []string {
+	var result []string
+	for _, rr := range reply.Answer {
+		switch answer := rr.(type) {
+		case *dns.HTTPS:
+			result = append(result, answer.String())
+		default:
+			continue
+		}
+	}
+	return result
+}
+
+func answerHttps(reply *dns.Msg) string {
+	svcrs := replyHTTPS(reply)
+	var result string
+	for _, v := range svcrs {
+		result += v
+		result += ";"
+	}
+	return result
+}
+
 func replyString(reply *dns.Msg) string {
 	if reply == nil {
 		return ""
 	}
-	return answerIPString(reply) + answerCDNameString(reply)
+
+	var result string
+	ip := answerIPString(reply)
+	if len(ip) > 0 {
+		result += "[IP]"
+		result += ip
+		result += ";"
+	}
+
+	cdname := answerCDNameString(reply)
+	if len(cdname) > 0 {
+		result += "[CDNAME]"
+		result += cdname
+		result += ";"
+	}
+
+	svcr := answerHttps(reply)
+	if len(svcr) > 0 {
+		result += "[HTTPS]"
+		result += svcr
+		result += ";"
+	}
+
+	//auth := authority(reply)
+	//if len(auth) > 0 {
+	//	result += "[NS]"
+	//	result += auth
+	//	result += ";"
+	//}
+	return result
+}
+
+func authority(msg *dns.Msg) string {
+	var result string
+	for _, v := range msg.Ns {
+		result += v.String()
+		result += ";"
+	}
+	return result
 }

@@ -39,6 +39,7 @@ func InitLogrus(name string, maxMB int, level logrus.Level) {
 		DisableTimestamp: false,
 		TimestampFormat:  "2006-01-02 15:04:05",
 		SortingFunc:      SortingFunc,
+		DisableQuote:     true,
 	}
 
 	logrus.SetFormatter(formatter)
@@ -58,6 +59,7 @@ func NewDefaultHook(name string, maxSize int) *DefaultHook {
 		DisableTimestamp: false,
 		TimestampFormat:  "2006-01-02 15:04:05",
 		SortingFunc:      SortingFunc,
+		DisableQuote:     true,
 	}
 
 	writer := &lumberjack.Logger{
