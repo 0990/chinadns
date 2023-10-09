@@ -29,9 +29,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	fmt.Println("version:", version.String())
-	fmt.Println("build:", version.BuildString())
-
 	cfgFile := *confFile
 	if *workingDir != "" {
 		cfgFile = *workingDir + "/" + cfgFile
@@ -65,8 +62,6 @@ func main() {
 		logName = filepath.Join(*workingDir, logName)
 	}
 
-	logrus.Info("config:", cfg)
-
 	level, err := logrus.ParseLevel(cfg.LogLevel)
 	if err != nil {
 		logrus.Fatalln(err)
@@ -82,6 +77,12 @@ func main() {
 	}()
 
 	logconfig.InitLogrus(logName, 10, level)
+
+	logrus.Info("config", cfg)
+	logrus.WithFields(logrus.Fields{
+		"version": version.String(),
+		"build":   version.BuildString(),
+	}).Info("app version")
 
 	copts := []chinadns.ClientOption{
 		chinadns.WithUDPMaxBytes(cfg.UDPMaxBytes),
