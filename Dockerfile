@@ -1,13 +1,14 @@
-FROM golang:1.20.5 AS builder
-WORKDIR app
-COPY . .
+FROM golang:1.21.3-alpine AS builder
+WORKDIR /src
+COPY . /src
 
-RUN go env -w GOPROXY="https://goproxy.cn,direct"
-RUN CGO_ENABLED=0 go build -o /bin/chinadns ./cmd/server/main.go
+RUN apk add --update --no-cache make git \
+    && make chinadns
+
 
 FROM scratch as chinadns
 WORKDIR /0990
 WORKDIR bin
-COPY --from=builder /bin/chinadns .
+COPY --from=builder /src/build/chinadns .
 WORKDIR /0990/config
 CMD ["../bin/chinadns","-c","chinadns.json"]

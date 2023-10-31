@@ -9,36 +9,79 @@
 
 name: Publish Docker image
 
+concurrency:
+  group: docker-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
+    branches:
+      - 'master'
     tags:
       - '*'
 
 jobs:
-  push_to_registry:
-    name: Push Docker image to Docker Hub
+
+  build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the repo
+
+      - name: Check out code into the Go module directory
         uses: actions/checkout@v3
-      
-      - name: Log in to Docker Hub
-        uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          version: latest
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
         with:
-          images: 0990/chinadns
-      
-      - name: Build and push Docker image
-        uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+          registry: ghcr.io
+          username: 0990
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get Version
+        id: shell
+        run: |
+          echo "version=$(git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+
+      - name: Build and Push(dev)
+        if: github.ref == 'refs/heads/master'
+        uses: docker/build-push-action@v3
         with:
           context: .
-          file: ./Dockerfile
           push: true
-          tags: 0990/chinadns:latest,${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64
+          tags: | 
+            0990/chinadns:dev
+            ghcr.io/0990/chinadns:dev
+
+      - name: Build and Push(latest)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64
+          tags: | 
+            0990/chinadns:latest
+            0990/chinadns:${{ steps.shell.outputs.version }}
+            ghcr.io/0990/chinadns:latest
+            ghcr.io/0990/chinadns:${{ steps.shell.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
