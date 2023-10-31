@@ -47,6 +47,7 @@ linux-arm64:
 	GOARCH=arm64 GOOS=linux $(GO_BUILD) -o $(BUILD_DIR)/$(BINARY)-$@ $(BUILD_PACKAGE)
 
 zip-config:
+	$(shell mkdir -p $(BUILD_DIR))
 	@zip -rqj $(BUILD_DIR)/$(CONFIG_ZIP_NAME) $(CONFIG_DIR)
 
 chinadns:
